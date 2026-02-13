@@ -1,25 +1,25 @@
-import os  # Добавили для создания директорий
+import os
+import re
+import json
+import asyncio
+import datetime
+import requests
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-import datetime
-import requests  # Добавили для связи с DeepSeek
-import asyncio
 from playwright.async_api import async_playwright
-import json
 
 app = FastAPI()
 
-# Константы для связи с локальным ИИ
+# Configuration
 LLM_SERVER_URL = "http://127.0.0.1:8080/v1/chat/completions"
-# Ваш трехязычный промпт из prompts.md
 SYSTEM_PROMPT = """
 You are a Senior Fullstack Developer (PHP/Python) and an expert in OpenEMIS Core. 
-Your task is to generate robust automation code.
-- Environment: macOS (Monterey), Python 3.13, Playwright 1.48.
-- Strict Requirement: Use system Chrome (channel="chrome") to bypass legacy OS library compatibility issues.
-- Context: Reference api-docs-v5.json and CakePHP model structures for precision. Use async_playwright exclusively.
+Task: Generate robust automation code.
+- Env: macOS (Monterey), Python 3.13, Playwright 1.48.
+- Requirements: Use channel="chrome", async_playwright exclusively.
+- Precision: Reference api-docs-v5.json and CakePHP model structures.
 """
 
 app.add_middleware(
@@ -30,119 +30,78 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print(f"--- SERVER STARTING AT {datetime.datetime.now()} ---")
-print("VERSION: 1.0.7 (DeepSeek Integration)")
 
-
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    if request.method == "OPTIONS":
-        return JSONResponse(
-            content="OK",
-            headers={
-                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-                "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization, x-requested-with",
-                "Access-Control-Allow-Private-Network": "true",
-                "Access-Control-Max-Age": "86400",
-            }
-        )
-    return await call_next(request)
-
-
-# Добавьте эту функцию в main.py
 async def execute_automation(script_code: str):
+    """Parses and runs the generated Playwright code"""
     async with async_playwright() as p:
-        # Используем ваш рабочий метод через системный Chrome
+        # Launch system Chrome to bypass legacy OS issues
         browser = await p.chromium.launch(headless=False, channel="chrome")
-        page = await browser.new_page()
+        context = await browser.new_context(ignore_https_errors=True)
+        page = await context.new_page()
+
         try:
-            # Здесь мы выполняем код, который сгенерировал DeepSeek
-            # Для безопасности в реальных проектах используют песочницы,
-            # но для локального демо мы доверяем нашему DeepSeek
-            exec_scope = {"page": page, "expect": None}
-            # Очищаем код от markdown-оберток ```python ... ```
-            clean_code = script_code.replace("```python", "").replace("```", "").strip()
+            # Extract code between triple backticks
+            match = re.search(r"```python\n(.*?)\n```", script_code, re.DOTALL)
+            code_to_run = match.group(1) if match else script_code.replace("```", "")
 
-            # Выполняем скрипт
-            exec(f"async def run():\n{chr(10).join(['    ' + l for l in clean_code.splitlines()])}\n", exec_scope)
-            await exec_scope["run"]()
+            exec_scope = {"page": page, "asyncio": asyncio}
+            formatted_code = f"async def run_task():\n" + "\n".join(f"    {line}" for line in code_to_run.splitlines())
 
-            await page.screenshot(path=f"openemis_result_{datetime.datetime.now().strftime('%H%M%S')}.png")
+            exec(formatted_code, exec_scope)
+            await exec_scope["run_task"]()
+
+            # Save result with timestamp
+            ts = datetime.datetime.now().strftime("%H%M%S")
+            await page.screenshot(path=f"logs/screenshot_{ts}.png")
+        except Exception as e:
+            print(f"Automation Execution Error: {e}")
         finally:
             await browser.close()
 
 
-# Refactored log_interaction function
-def log_interaction(request: Request, user_message: str, ai_response: str, executed_automation: bool = False):
+def log_interaction(request: Request, user_message: str, ai_response: str, executed: bool):
+    """Thread-safe logging to partitioned directory"""
     client_ip = request.client.host
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    
-    log_dir = os.path.join("logs", client_ip, current_date)
+    date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+    log_dir = os.path.join("logs", client_ip, date_str)
     os.makedirs(log_dir, exist_ok=True)
-    
-    log_file_path = os.path.join(log_dir, "agent_history.jsonl")
-    
-    log_data = {
+
+    log_entry = {
         "timestamp": str(datetime.datetime.now()),
-        "user_request": user_message,
-        "ai_response": ai_response,
-        "executed_automation": executed_automation,
-        "ip_address": client_ip
+        "request": user_message,
+        "ai_output": ai_response,
+        "executed": executed,
+        "ip": client_ip
     }
-    
-    with open(log_file_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
+    with open(os.path.join(log_dir, "history.jsonl"), "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
 
-@app.options("/{rest_of_path:path}")
-async def preflight_handler(request: Request):
-    # Manual OPTIONS handler to ensure preflight requests always get a 200 OK
-    print(f"DEBUG: OPTIONS preflight request to {request.url}")
-    return JSONResponse(
-        content="OK",
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Max-Age": "86400" # Cache preflight for 24 hours
-        }
-    )
-
-# Обновите эндпоинт, чтобы он вызывал выполнение, если в запросе есть слово "execute"
 @app.post("/chat")
 async def chat_endpoint(request: Request):
-    user_message = "" # Initialize user_message for error logging
     try:
         data = await request.json()
-        user_message = data.get("message", "")
+        msg = data.get("message", "").lower()
 
-        # Запрос к DeepSeek
-        payload = {
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_message}
-            ]
-        }
-        response = requests.post(LLM_SERVER_URL, json=payload)
-        ai_response = response.json()['choices'][0]['message']['content']
+        # Request to local DeepSeek
+        payload = {"messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": msg}]}
+        ai_raw = requests.post(LLM_SERVER_URL, json=payload, timeout=60).json()
+        ai_text = ai_raw['choices'][0]['message']['content']
 
-        automation_triggered = False
-        # Если вы попросили "выполни" или "execute", запускаем Playwright
-        if "выполни" in user_message.lower() or "run" in user_message.lower():
-            asyncio.create_task(execute_automation(ai_response))
-            automation_triggered = True
-            log_interaction(request, user_message, ai_response, executed_automation=True) # Log when automation is triggered
-            return JSONResponse(content={"response": "Код сгенерирован и запущен на выполнение! Проверь окно браузера."})
+        is_action = any(word in msg for word in ["выполни", "run", "execute", "click"])
 
-        log_interaction(request, user_message, ai_response, executed_automation=False) # Log normal AI response
-        return JSONResponse(content={"response": ai_response})
+        if is_action:
+            asyncio.create_task(execute_automation(ai_text))
+            log_interaction(request, msg, ai_text, True)
+            return JSONResponse({"response": "Код сгенерирован и запущен. Проверьте Chrome."})
+
+        log_interaction(request, msg, ai_text, False)
+        return JSONResponse({"response": ai_text})
 
     except Exception as e:
-        print(f"ERROR: {e}")
-        # Log error interactions
-        log_interaction(request, user_message, f"ERROR: {str(e)}", executed_automation=False)
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
 
 if __name__ == "__main__":
+    print(f"--- AGENT SERVER READY | {datetime.datetime.now()} ---")
     uvicorn.run(app, host="0.0.0.0", port=8000)

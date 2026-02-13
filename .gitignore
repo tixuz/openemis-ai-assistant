@@ -3,3 +3,21 @@
 __pycache__/
 *.pyc
 logs/
+
+# Docker
+docker/.env
+*.log
+
+# Data
+data/learning/examples.jsonl
+data/users.json
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+*.swp
+*.swo
