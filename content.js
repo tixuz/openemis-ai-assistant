@@ -1,10 +1,3 @@
-// Function to inject styles
-function injectStyles(css) {
-    const styleElement = document.createElement('style');
-    styleElement.textContent = css;
-    document.head.append(styleElement);
-}
-
 // Function to inject the AI button
 function injectAIButton() {
     const aiButton = document.createElement('button');
@@ -57,9 +50,5 @@ AI: Error connecting to server.`;
     });
 }
 
-// Inject styles from styles.css
-fetch(chrome.runtime.getURL('styles.css'))
-    .then(response => response.text())
-    .then(injectStyles)
-    .then(injectAIButton)
-    .catch(err => console.error('Error loading styles.css:', err));
+// Directly inject the AI button since styles are handled by manifest.json
+injectAIButton();

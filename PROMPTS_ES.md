@@ -1,20 +1,26 @@
-# Registro de Desarrollo: Agente de IA para OpenEMIS
+# Registro de Desarrollo: Agente de IA para OpenEMIS (Asistente Full-stack)
 
-Este proyecto demuestra la implementación de agentes de IA para la automatización de flujos de trabajo en plataformas ERP educativas.
+Este documento detalla la metodología de prompts utilizada para construir un puente entre la interfaz de OpenEMIS y un motor de IA local.
 
-### Fase 1: Estructura Base (Boilerplate)
-**Objetivo:** Crear un puente entre el navegador y un servidor de IA local.
-
-**Prompt utilizado:**
-> "Tengo un proyecto de Python 3.13 en PyCharm. Necesito un boilerplate para una extensión de Chrome + backend en FastAPI. Genera el código para main.py, manifest.json, content.js y styles.css. La extensión debe inyectar un botón en la interfaz y comunicarse con el servidor local."
-
-### Fase 2: Configuración de Infraestructura
-**Objetivo:** Gestión de dependencias y despliegue seguro en GitHub.
+### Fase 1: Arquitectura de Referencia (Boilerplate)
+**Objetivo:** Crear una comunicación fluida entre una extensión de Chrome (V3) y un backend en FastAPI (Python 3.13).
 
 **Prompt utilizado:**
-> "Ayúdame a configurar las llaves SSH en macOS para GitHub, solucionar conflictos de ramas master/main y generar el archivo de requerimientos para un entorno productivo."
+> "Tengo un proyecto de Python 3.13 en PyCharm. Genera un boilerplate para una extensión de Chrome y un backend en FastAPI. La extensión debe inyectar un botón de 'AI' en el DOM y enviar peticiones fetch a localhost:8000/chat."
 
-### Estado del Proyecto
-- [x] Backend FastAPI operativo y testeado.
-- [x] Extensión de Chrome inyectando elementos correctamente.
-- [x] Repositorio sincronizado con estándares de seguridad SSH.
+### Fase 2: Depuración de Red y Seguridad (CORS & PNA)
+**Desafío:** Error 400 Bad Request en las peticiones OPTIONS debido a las políticas de seguridad de Chrome al llamar a la red privada (localhost) desde un dominio público (demo.openemis.org).
+
+**Prompt de depuración:**
+> "El backend recibe POST pero falla en el preflight OPTIONS con error 400. Implementa un middleware de registro profundo para visualizar los headers. Asegúrate de manejar el encabezado 'Access-Control-Allow-Private-Network: true' para permitir el acceso desde dominios externos a la red local."
+
+### Fase 3: Interfaz de Usuario e Aislamiento Visual
+**Objetivo:** Garantizar la legibilidad del asistente independientemente del tema (claro/oscuro) del sitio web anfitrión.
+
+**Prompt de diseño:**
+> "Actualiza styles.css. El cuadro de chat debe tener `background-color: white !important` y `color: black !important` para evitar conflictos con el modo oscuro de OpenEMIS. Usa aislamiento de estilos para que el texto sea siempre visible."
+
+### Estado Actual del Proyecto
+- [x] Conexión establecida y verificada (200 OK) para OPTIONS y POST.
+- [x] Bypass exitoso de las restricciones de "Private Network Access" de Chrome.
+- [x] Interfaz de usuario estable y legible en cualquier entorno.

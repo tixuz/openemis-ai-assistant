@@ -18,3 +18,10 @@ This repository focuses on building a Natural Language UI (NLUI) for educational
 - [x] FastAPI server responding to async requests.
 - [x] Chrome Extension successfully manipulating the DOM.
 - [x] Automated dependency tracking via pip freeze.
+
+### Phase 3: Network Security & Debugging (CORS/PNA)
+**Challenge:** Resolving 400 Bad Request errors on preflight OPTIONS requests from external domains.
+**Action:** - Implemented request "X-ray" logging in FastAPI Middleware. 
+- Identified and bypassed Chrome's "Private Network Access" (PNA) restrictions.
+- Added explicit support for `Access-Control-Allow-Private-Network` header.
+**Result:** Verified end-to-end communication (200 OK) for both OPTIONS and POST methods.
