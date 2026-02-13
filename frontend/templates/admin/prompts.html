@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Prompt Engineering{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <h2>System Prompt Editor</h2>
+
+    <div class="prompt-editor">
+        <div class="editor-toolbar">
+            <button id="load-prompt" class="btn btn-secondary">Load Current</button>
+            <button id="save-prompt" class="btn btn-primary">Save Prompt</button>
+            <button id="test-prompt" class="btn btn-secondary">Test</button>
+        </div>
+
+        <textarea id="prompt-content" placeholder="Loading prompt..."></textarea>
+
+        <div id="test-section" style="display: none;">
+            <h3>Test Prompt</h3>
+            <input type="text" id="test-task" placeholder="Enter task to test..." />
+            <button id="run-test" class="btn btn-primary">Generate Commands</button>
+            <pre id="test-result"></pre>
+        </div>
+    </div>
+</div>
+
+<style>
+.prompt-editor {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.editor-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+#prompt-content {
+    width: 100%;
+    min-height: 500px;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Monaco', monospace;
+    font-size: 13px;
+    resize: vertical;
+}
+
+#test-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 2px solid #e0e0e0;
+}
+
+#test-task {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin: 1rem 0;
+}
+
+#test-result {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const promptContent = document.getElementById('prompt-content');
+    const testSection = document.getElementById('test-section');
+    const testTask = document.getElementById('test-task');
+    const testResult = document.getElementById('test-result');
+
+    // Load current prompt
+    document.getElementById('load-prompt').addEventListener('click', async () => {
+        try {
+            const data = await apiClient.get('admin/prompts');
+            promptContent.value = data.content;
+        } catch (error) {
+            alert('Failed to load prompt: ' + error.message);
+        }
+    });
+
+    // Save prompt
+    document.getElementById('save-prompt').addEventListener('click', async () => {
+        try {
+            await apiClient.post('admin/prompts', {
+                content: promptContent.value
+            });
+            alert('Prompt saved successfully!');
+        } catch (error) {
+            alert('Failed to save prompt: ' + error.message);
+        }
+    });
+
+    // Show test section
+    document.getElementById('test-prompt').addEventListener('click', () => {
+        testSection.style.display = 'block';
+    });
+
+    // Run test
+    document.getElementById('run-test').addEventListener('click', async () => {
+        const task = testTask.value.trim();
+        if (!task) {
+            alert('Please enter a task to test');
+            return;
+        }
+
+        testResult.textContent = 'Generating commands...';
+
+        try {
+            const data = await apiClient.post('admin/test?task=' + encodeURIComponent(task));
+            testResult.textContent = JSON.stringify(data, null, 2);
+        } catch (error) {
+            testResult.textContent = 'Error: ' + error.message;
+        }
+    });
+
+    // Auto-load on page load
+    document.getElementById('load-prompt').click();
+});
+</script>
+{% endblock %}

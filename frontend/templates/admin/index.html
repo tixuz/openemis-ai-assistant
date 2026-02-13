@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <h2>Admin Dashboard</h2>
+
+    <div class="dashboard-grid">
+        <div class="card">
+            <h3>📝 Prompt Engineering</h3>
+            <p>Edit and test system prompts</p>
+            <a href="{{ url_for('admin_prompts') }}" class="btn btn-primary">Manage Prompts</a>
+        </div>
+
+        <div class="card">
+            <h3>📚 Learning Examples</h3>
+            <p>View and manage automation examples</p>
+            <a href="{{ url_for('admin_examples') }}" class="btn btn-primary">View Examples</a>
+        </div>
+
+        <div class="card">
+            <h3>📊 Analytics</h3>
+            <p>Usage statistics and performance</p>
+            <a href="{{ url_for('admin_analytics') }}" class="btn btn-primary">View Analytics</a>
+        </div>
+
+        <div class="card">
+            <h3>💬 User Chat</h3>
+            <p>Test the user chat interface</p>
+            <a href="{{ url_for('user_chat') }}" class="btn btn-secondary">Go to Chat</a>
+        </div>
+    </div>
+</div>
+
+<style>
+.admin-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.card {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.card h3 {
+    margin-bottom: 0.5rem;
+}
+
+.card p {
+    color: #666;
+    margin-bottom: 1rem;
+}
+</style>
+{% endblock %}

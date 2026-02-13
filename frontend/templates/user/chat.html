@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - AI Automation{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/user.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <h2>AI Automation Assistant</h2>
+        <p>Ask me to automate tasks in OpenEMIS</p>
+    </div>
+
+    <div id="chat-output" class="chat-output">
+        <div class="message ai">
+            <strong>AI Assistant:</strong><br>
+            Hello! I can help you automate tasks in OpenEMIS. Try asking me to:<br>
+            • "Login to OpenEMIS as admin"<br>
+            • "Navigate to the students page"<br>
+            • "Click the add button"<br>
+            Use action words like <strong>run</strong>, <strong>execute</strong>, <strong>click</strong>, etc.
+        </div>
+    </div>
+
+    <div class="chat-input-container">
+        <input type="text" id="chat-input" placeholder="Ask me to automate something..." autofocus>
+        <button id="send-btn" class="btn btn-primary">Send</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/user.js') }}"></script>
+{% endblock %}

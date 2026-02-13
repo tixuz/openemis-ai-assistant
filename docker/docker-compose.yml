@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend
+  fastapi:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.fastapi
+    container_name: ai-automation-fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      # LLM Server (running on host via start_ai.sh)
+      - LLM_SERVER_URL=http://host.docker.internal:8080/v1/chat/completions
+
+      # Redis connection
+      - REDIS_URL=redis://redis:6379
+
+      # Security
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-this-in-production}
+
+      # CORS - allows localhost with any port via regex
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://demo.openemis.org}
+      - CORS_ORIGIN_REGEX=${CORS_ORIGIN_REGEX:-^https?://(localhost|127\.0\.0\.1)(:\d+)?$}
+
+      # Logging
+      - LOG_LEVEL=INFO
+
+      # Paths
+      - DATA_DIR=/app/data
+      - LOGS_DIR=/app/logs
+    volumes:
+      # Persist data and logs
+      - ../data:/app/data
+      - ../logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ai-automation-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+  # Flask Frontend
+  flask:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.flask
+    container_name: ai-automation-flask
+    ports:
+      - "3000:3000"
+    environment:
+      # FastAPI backend URL (internal network)
+      - FASTAPI_URL=http://fastapi:8000
+
+      # Flask secret key
+      - SECRET_KEY=${FLASK_SECRET_KEY:-flask-secret-key-change-this}
+    volumes:
+      # Mount templates and static for development
+      - ../frontend/templates:/app/frontend/templates
+      - ../frontend/static:/app/frontend/static
+    depends_on:
+      - fastapi
+    restart: unless-stopped
+    networks:
+      - ai-automation-net
+
+  # Redis for session storage and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: ai-automation-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - ai-automation-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  ai-automation-net:
+    driver: bridge
