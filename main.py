@@ -1,16 +1,30 @@
-# This is a sample Python script.
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleWARE
+import uvicorn
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+app = FastAPI()
 
+# Allow CORS for the Chrome Extension to communicate with the backend
+origins = [
+    "http://localhost:8000", # FastAPI's default host
+    "chrome-extension://*", # Allow all Chrome Extensions, though you might want to restrict this in production
+]
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # For development, allow all origins. In production, restrict to your extension ID.
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+@app.post("/chat")
+async def chat_endpoint(request: Request):
+    data = await request.json()
+    user_message = data.get("message", "No message provided")
+    response_message = f"Echo from server: {user_message}"
+    return JSONResponse(content={"response": response_message})
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
