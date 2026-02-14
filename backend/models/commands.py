@@ -22,11 +22,11 @@ class NavigateCommand(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_domain(cls, v):
-        """Only allow localhost and openemis.org domains"""
+        """Only allow localhost (any port) and openemis.org domains"""
         url_str = str(v)
         allowed_domains = [
-            "localhost",
-            "127.0.0.1",
+            "localhost",      # Matches localhost:any_port
+            "127.0.0.1",      # Matches 127.0.0.1:any_port
             "0.0.0.0",
             "openemis.org",
             "demo.openemis.org"
@@ -34,7 +34,7 @@ class NavigateCommand(BaseModel):
 
         if not any(domain in url_str for domain in allowed_domains):
             raise ValueError(
-                f"Domain not in whitelist. Allowed: {', '.join(allowed_domains)}"
+                f"Domain not in whitelist. Allowed: {', '.join(allowed_domains)} (any port)"
             )
         return v
 
