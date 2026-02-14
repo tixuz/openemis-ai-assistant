@@ -1,6 +1,60 @@
+console.log('content.js loaded and executing.');
 // Content script - Injects AI chat interface with JWT authentication
 
+function get_css_selector(element) {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) {
+        return null;
+    }
+
+    const path = [];
+    while (element.nodeType === Node.ELEMENT_NODE) {
+        let selector = element.nodeName.toLowerCase();
+        if (element.id) {
+            selector += '#' + element.id;
+            path.unshift(selector);
+            break;
+        } else {
+            let sib = element, nth = 1;
+            while ((sib = sib.previousElementSibling)) {
+                if (sib.nodeName.toLowerCase() === selector) {
+                    nth++;
+                }
+            }
+            if (nth !== 1) {
+                selector += ':nth-of-type(' + nth + ')';
+            }
+        }
+        path.unshift(selector);
+        element = element.parentNode;
+    }
+    return path.join(' > ');
+}
+
+function is_openemis_page() {
+    const footer = document.querySelector('footer');
+    const is_openemis = footer && footer.innerText.includes('OpenEMIS');
+    console.log('is_openemis_page check: footer content =', footer ? footer.innerText : 'No footer found', '; Is OpenEMIS =', is_openemis);
+    return is_openemis;
+}
+
+function initializeExtension() {
+    console.log('DOMContentLoaded fired.');
+    console.log('Is this an OpenEMIS page?', is_openemis_page());
+
+    // Inject AI Button only if it's an OpenEMIS page
+    if (is_openemis_page()) {
+        injectAIButton();
+
+        // Click listener remains conditional
+        document.body.addEventListener('click', (event) => {
+            const selector = get_css_selector(event.target);
+            console.log(`You've clicked this: ${selector}`);
+        });
+    }
+}
+
 function injectAIButton() {
+    console.log('injectAIButton called.');
     // Check if already injected
     if (document.getElementById('ai-assistant-button')) {
         return;
@@ -127,14 +181,70 @@ function addThinkingIndicator() {
     output.scrollTop = output.scrollHeight;
 }
 
+// Добавьте это в content_script.js вашего расширения
+let isRecording = false;
+
+function startRecording() {
+    isRecording = true;
+    console.log("Recording started...");
+}
+
+// content_script.js
+
+// 1. Сама функция вычисления селектора
+function getSelector(el) {
+    if (el.id) return `#${el.id}`; // Самый надежный вариант - ID
+
+    // Если ID нет, строим путь через теги (например, div > span > button)
+    let path = [];
+    while (el.nodeType === Node.ELEMENT_NODE) {
+        let selector = el.nodeName.toLowerCase();
+        if (el.className) {
+            selector += "." + el.className.trim().replace(/\s+/g, ".");
+        }
+        path.unshift(selector);
+        el = el.parentNode;
+    }
+    return path.join(" > ");
+}
+
+// 2. Слушатель событий, который использует эту функцию
+document.addEventListener('click', (e) => {
+    if (!isRecording) return;
+
+    const selector = getSelector(e.target); // Вызываем функцию здесь
+    console.log("Clicked selector:", selector);
+
+    // Отправляем на ваш FastAPI бэкенд
+    sendToBackend({
+        type: 'click',
+        selector: selector,
+        url: window.location.href
+    });
+});
+
+document.addEventListener('change', (e) => {
+    if (!isRecording || e.target.type === 'password') return; // Игнорируем пароли
+
+    const action = {
+        type: 'input',
+        selector: getSelector(e.target),
+        value: e.target.value,
+        url: window.location.href,
+        timestamp: Date.now()
+    };
+    sendToBackend(action);
+});
+
 function removeThinkingIndicator() {
     const thinking = document.getElementById('ai-thinking');
     if (thinking) thinking.remove();
 }
 
-// Inject when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectAIButton);
+    document.addEventListener('DOMContentLoaded', initializeExtension);
 } else {
-    injectAIButton();
+    initializeExtension();
 }
+
+

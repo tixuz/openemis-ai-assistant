@@ -8,9 +8,13 @@ Production-ready backend with:
 - Safe command execution (no exec())
 - Learning mechanism
 """
+import datetime
+import os
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import json
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -120,6 +124,21 @@ async def root():
         ]
     }
 
+
+@app.post("/record")
+async def record_action(request: Request):
+    data = await request.json()
+    client_ip = request.client.host
+    date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+
+    # Сохраняем шаги в файл текущей сессии
+    session_file = os.path.join("logs", client_ip, date_str, "current_session.jsonl")
+    os.makedirs(os.path.dirname(session_file), exist_ok=True)
+
+    with open(session_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(data, ensure_ascii=False) + "\n")
+
+    return JSONResponse({"status": "recorded"})
 
 # Error handlers
 @app.exception_handler(Exception)
