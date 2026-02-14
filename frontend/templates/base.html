@@ -23,8 +23,11 @@
                 <a href="{{ url_for('admin_prompts') }}" class="nav-link {% if request.endpoint == 'admin_prompts' %}active{% endif %}">
                     ✏️ Prompts
                 </a>
+                <a href="{{ url_for('admin_scripts') }}" class="nav-link {% if request.endpoint == 'admin_scripts' %}active{% endif %}">
+                    📚 Scripts
+                </a>
                 <a href="{{ url_for('admin_examples') }}" class="nav-link {% if request.endpoint == 'admin_examples' %}active{% endif %}">
-                    📚 Examples
+                    💡 Examples
                 </a>
                 <a href="{{ url_for('admin_analytics') }}" class="nav-link {% if request.endpoint == 'admin_analytics' %}active{% endif %}">
                     📈 Analytics
@@ -34,6 +37,11 @@
                 </a>
                 <span class="nav-divider">|</span>
             {% endif %}
+
+            <!-- Run Scripts (available to all logged-in users) -->
+            <a href="{{ url_for('admin_run_script') }}" class="nav-link {% if request.endpoint == 'admin_run_script' %}active{% endif %}">
+                ▶️ Run Script
+            </a>
 
             <!-- User Chat (available to all logged-in users) -->
             <a href="{{ url_for('user_chat') }}" class="nav-link {% if request.endpoint == 'user_chat' %}active{% endif %}">

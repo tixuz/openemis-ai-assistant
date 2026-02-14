@@ -159,6 +159,20 @@ def admin_llm_config():
     return render_template('admin/llm_config.html', username=session.get('username'))
 
 
+@app.route('/admin/scripts')
+@admin_required
+def admin_scripts():
+    """Script library management"""
+    return render_template('admin/scripts.html', username=session.get('username'))
+
+
+@app.route('/admin/run-script')
+@login_required
+def admin_run_script():
+    """Run saved scripts (available to all users)"""
+    return render_template('admin/run_script.html', username=session.get('username'))
+
+
 # API Proxy routes (to avoid CORS issues from frontend)
 @app.route('/api/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @login_required

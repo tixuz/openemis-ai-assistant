@@ -25,9 +25,10 @@ class NavigateCommand(BaseModel):
         """Only allow localhost (any port) and openemis.org domains"""
         url_str = str(v)
         allowed_domains = [
-            "localhost",      # Matches localhost:any_port
-            "127.0.0.1",      # Matches 127.0.0.1:any_port
+            "localhost",              # Host machine (outside Docker)
+            "127.0.0.1",              # Loopback
             "0.0.0.0",
+            "host.docker.internal",   # Host machine FROM Docker
             "openemis.org",
             "demo.openemis.org"
         ]

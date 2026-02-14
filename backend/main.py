@@ -17,7 +17,7 @@ from slowapi.errors import RateLimitExceeded
 import logging
 
 from backend.config import settings
-from backend.api.routes import auth, automation, user, admin, variables
+from backend.api.routes import auth, automation, user, admin, variables, scripts
 
 
 # Configure logging
@@ -72,6 +72,7 @@ app.include_router(automation.router)
 app.include_router(user.router)
 app.include_router(admin.router)
 app.include_router(variables.router)
+app.include_router(scripts.router)
 
 
 # Health check endpoint

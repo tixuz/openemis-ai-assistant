@@ -17,14 +17,70 @@ from backend.core.learning_store import get_learning_store
 from backend.core.history_store import get_history_store
 from backend.core.variables_store import get_variables_store
 from backend.core.prompt_manager import get_prompt_manager
+from backend.core.script_store import get_script_store
 from backend.models.learning import LearningExample
+from backend.models.scripts import AutomationScript
+from backend.models.commands import Command
 from backend.config import settings
+import re
+import json
+from pydantic import TypeAdapter
+from typing import List
 
 
 router = APIRouter(prefix="/user", tags=["User"])
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
+
+
+async def detect_and_execute_script(
+    message: str,
+    user: User,
+    variables_store
+) -> tuple[bool, List[Command], str]:
+    """
+    Detect if message contains "run {script_name}" and execute it.
+
+    Returns:
+        (found_script, commands, script_name)
+    """
+    # Pattern: "run <script_name> script" or "execute <script_name>"
+    patterns = [
+        r'run\s+(?:the\s+)?(\w+)\s+script',
+        r'execute\s+(?:the\s+)?(\w+)\s+script',
+        r'run\s+(\w+)',
+        r'execute\s+(\w+)',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, message.lower())
+        if match:
+            script_name = match.group(1)
+
+            # Try to find the script
+            script_store = get_script_store()
+            script = await script_store.get_script(script_name)
+
+            if script:
+                # Load user variables
+                user_variables = await variables_store.get_variables_dict(user.username)
+
+                # Substitute parameters in commands
+                commands_json = json.dumps(script.commands)
+
+                # Substitute user variables (if script uses {my_username}, etc.)
+                for var_key, var_value in user_variables.items():
+                    commands_json = commands_json.replace(f"{{{var_key}}}", var_value)
+
+                # Parse commands
+                commands_data = json.loads(commands_json)
+                command_list_adapter = TypeAdapter(List[Command])
+                commands = command_list_adapter.validate_python(commands_data)
+
+                return (True, commands, script.name)
+
+    return (False, [], "")
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -48,27 +104,39 @@ async def chat(
     """
     message = chat_req.message.lower()
 
-    # Determine if this is an action request
-    action_keywords = [
-        "run", "execute", "perform", "do", "click", "fill",
-        "navigate", "go to", "open", "login", "выполни"
-    ]
-    is_action = any(keyword in message for keyword in action_keywords)
-
     try:
         # Get dependencies
         llm_client = LLMClient(server_url=settings.LLM_SERVER_URL)
         learning_store = get_learning_store()
         prompt_manager = get_prompt_manager()
         variables_store = get_variables_store()
+        script_store = get_script_store()
 
         # Load user variables
         user_variables = await variables_store.get_variables_dict(user.username)
 
+        # Check if user wants to run a saved script
+        found_script, script_commands, script_name = await detect_and_execute_script(
+            chat_req.message,
+            user,
+            variables_store
+        )
+
+        # Determine if this needs additional LLM-generated commands
+        # Pattern: "run login, then navigate to X"
+        has_additional_actions = found_script and ("then" in message or "and then" in message)
+
+        # Initialize commands list
+        all_commands = []
+
+        # Start with script commands if found
+        if found_script:
+            all_commands.extend(script_commands)
+
         # Find similar examples
         similar_examples = await learning_store.find_similar(chat_req.message, limit=3)
 
-        # Build prompt with variables information
+        # Build prompt with variables and scripts information
         system_prompt = prompt_manager.build_enhanced_prompt(similar_examples)
 
         # Add variables info to prompt if user has any
@@ -79,50 +147,83 @@ async def chat(
                 variables_info += f"- {{{key}}}\n"
             system_prompt += variables_info
 
-        if is_action:
-            # Generate and execute automation
-            commands = await llm_client.generate_commands(
-                user_intent=chat_req.message,
+        # Add available scripts to prompt
+        all_scripts = await script_store.get_all_scripts()
+        if all_scripts:
+            scripts_info = "\n\n## Available Saved Scripts:\n"
+            scripts_info += "User can reference these scripts by saying 'run {script_name}':\n"
+            for script in all_scripts:
+                scripts_info += f"- **{script.name}**: {script.description}\n"
+            system_prompt += scripts_info
+
+        # Determine if we need to generate additional commands
+        needs_llm_generation = (not found_script) or has_additional_actions
+
+        if needs_llm_generation:
+            # If chaining with script, extract the "then X" part for LLM
+            llm_intent = chat_req.message
+            if has_additional_actions:
+                # Extract text after "then" for LLM to generate commands
+                match = re.search(r'then\s+(.+)', message, re.IGNORECASE)
+                if match:
+                    llm_intent = match.group(1)
+
+            # Generate commands from LLM
+            generated_commands = await llm_client.generate_commands(
+                user_intent=llm_intent,
                 system_prompt=system_prompt,
                 examples=[ex.model_dump() for ex in similar_examples]
             )
 
-            # Substitute variables in commands
+            # Substitute variables in generated commands
             if user_variables:
-                for cmd in commands:
-                    # Substitute in all string fields
+                for cmd in generated_commands:
                     for field_name, field_value in cmd.model_dump().items():
                         if isinstance(field_value, str):
-                            # Replace {variable} with actual value
                             for var_key, var_value in user_variables.items():
                                 field_value = field_value.replace(f"{{{var_key}}}", var_value)
-                            # Update the field
                             setattr(cmd, field_name, field_value)
 
-            # Execute commands (headless=True for Docker environment)
-            result = await execute_automation(commands, headless=True)
+            # Add generated commands to the list
+            all_commands.extend(generated_commands)
+
+        # Execute all commands (script + generated)
+        if all_commands:
+            result = await execute_automation(all_commands, headless=True)
 
             # Save successful execution
             if result.success:
                 example = LearningExample(
                     task_description=chat_req.message,
                     user_intent=chat_req.message,
-                    commands=[cmd.model_dump() for cmd in commands],
+                    commands=[cmd.model_dump() for cmd in all_commands],
                     success=True,
                     context=chat_req.context or {},
                     execution_time_ms=result.execution_time_ms
                 )
                 await learning_store.save_example(example)
 
+                # Increment script execution count if used
+                if found_script:
+                    await script_store.increment_execution_count(script_name)
+
             # Format response with command details
             if result.success:
                 response_text = f"✅ Automation completed successfully!\n\n"
+
+                # Indicate if script was used
+                if found_script:
+                    response_text += f"🔧 **Used script:** `{script_name}`\n"
+                    if has_additional_actions:
+                        response_text += f"➕ **Plus additional actions** (generated by AI)\n"
+                    response_text += "\n"
+
                 response_text += f"**Commands executed:** {result.commands_executed}\n"
                 response_text += f"**Time:** {result.execution_time_ms}ms\n\n"
 
                 # Show what was done
                 response_text += "**Actions taken:**\n"
-                for i, cmd in enumerate(commands, 1):
+                for i, cmd in enumerate(all_commands, 1):
                     if cmd.type == "navigate":
                         response_text += f"{i}. 🌐 Navigated to: {cmd.url}\n"
                     elif cmd.type == "click":
@@ -154,7 +255,7 @@ async def chat(
                 username=user.username,
                 message=chat_req.message,
                 response=response_text,
-                commands_generated=len(commands),
+                commands_generated=len(all_commands),
                 executed=True,
                 execution_result=result.to_dict()
             )
@@ -162,20 +263,30 @@ async def chat(
 
             return ChatResponse(
                 response=response_text,
-                commands_generated=len(commands),
+                commands_generated=len(all_commands),
                 executed=True,
                 execution_result=result.to_dict()
             )
         else:
-            # Just a question - return helpful info
-            response_text = "I'm an automation assistant for OpenEMIS. "
-            response_text += "To execute an automation, use action words like 'run', 'execute', 'click', etc.\n\n"
-            response_text += f"Your message: \"{chat_req.message}\"\n\n"
-            response_text += "Try asking me to:\n"
-            response_text += "- Login to OpenEMIS as admin\n"
-            response_text += "- Navigate to the students page\n"
-            response_text += "- Click the add button\n"
-            response_text += "- Fill the form with data"
+            # No commands to execute - provide helpful info
+            response_text = "I'm an automation assistant for OpenEMIS.\n\n"
+
+            # If they mentioned a script that doesn't exist
+            if "run" in message or "execute" in message:
+                response_text += "💡 **Available scripts:**\n"
+                if all_scripts:
+                    for script in all_scripts:
+                        response_text += f"- `{script.name}`: {script.description}\n"
+                    response_text += "\n**Usage:** Say 'run {script_name}' to execute a script\n"
+                    response_text += "**Example:** 'run login then navigate to institutions'\n\n"
+                else:
+                    response_text += "No scripts available yet. Admins can create scripts at /admin/scripts\n\n"
+
+            # General help
+            response_text += "To execute automation, use action words like:\n"
+            response_text += "- 'run {script_name}' - Execute a saved script\n"
+            response_text += "- 'navigate to...', 'click...', 'fill...'\n"
+            response_text += "- 'login to OpenEMIS as admin'\n"
 
             # Save to conversation history
             history_store = get_history_store()

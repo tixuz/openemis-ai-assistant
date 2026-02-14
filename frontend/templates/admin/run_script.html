@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+
+{% block title %}Run Script - AI Automation{% endblock %}
+
+{% block extra_css %}
+<style>
+    .run-script-page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .header-section {
+        margin-bottom: 30px;
+    }
+
+    .main-content {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 30px;
+    }
+
+    .script-selector {
+        background: white;
+        border-radius: 8px;
+        padding: 25px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        height: fit-content;
+    }
+
+    .execution-panel {
+        background: white;
+        border-radius: 8px;
+        padding: 25px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #333;
+    }
+
+    .form-group select,
+    .form-group input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .script-info {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 15px;
+        font-size: 13px;
+    }
+
+    .script-info p {
+        margin: 5px 0;
+    }
+
+    .parameters-form {
+        margin-top: 20px;
+    }
+
+    .parameter-field {
+        margin-bottom: 15px;
+    }
+
+    .parameter-field label {
+        font-weight: 600;
+        display: block;
+        margin-bottom: 5px;
+    }
+
+    .parameter-field input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .parameter-field small {
+        color: #666;
+        font-size: 12px;
+    }
+
+    .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 16px;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #2196F3;
+        color: white;
+        width: 100%;
+    }
+
+    .btn-primary:hover {
+        background: #1976D2;
+    }
+
+    .btn-primary:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    .status-message {
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        display: none;
+    }
+
+    .status-message.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .status-message.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .status-message.info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+
+    .execution-result {
+        margin-top: 20px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        display: none;
+    }
+
+    .result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #ddd;
+    }
+
+    .result-content {
+        white-space: pre-wrap;
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    .screenshot-container {
+        margin-top: 20px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .screenshot-container img {
+        width: 100%;
+        display: block;
+        cursor: pointer;
+    }
+
+    .screenshot-label {
+        background: #f5f5f5;
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #666;
+    }
+
+    .spinner {
+        display: none;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .spinner-dots {
+        display: inline-block;
+    }
+
+    .spinner-dots span {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        background: #2196F3;
+        border-radius: 50%;
+        margin: 0 4px;
+        animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .spinner-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .spinner-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+        0%, 80%, 100% { transform: scale(0); }
+        40% { transform: scale(1); }
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #999;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="run-script-page">
+    <div class="header-section">
+        <h1>▶️ Run Script</h1>
+        <p style="color: #666;">Execute saved automation scripts with parameters</p>
+    </div>
+
+    <div class="status-message" id="status-message"></div>
+
+    <div class="main-content">
+        <!-- Script Selector -->
+        <div class="script-selector">
+            <h3>Select Script</h3>
+            <div class="form-group">
+                <label>Available Scripts</label>
+                <select id="script-select" onchange="scriptRunner.loadScriptDetails()">
+                    <option value="">Loading scripts...</option>
+                </select>
+            </div>
+
+            <div id="script-info" style="display: none;" class="script-info">
+                <p><strong>Description:</strong> <span id="info-description"></span></p>
+                <p><strong>Parameters:</strong> <span id="info-param-count">0</span></p>
+                <p><strong>Executed:</strong> <span id="info-exec-count">0</span> times</p>
+                <p><strong>Tags:</strong> <span id="info-tags"></span></p>
+            </div>
+        </div>
+
+        <!-- Execution Panel -->
+        <div class="execution-panel">
+            <h3>Execute Script</h3>
+
+            <div id="empty-state" class="empty-state">
+                <p>👈 Select a script to run</p>
+            </div>
+
+            <div id="execution-form" style="display: none;">
+                <form id="run-form" onsubmit="scriptRunner.executeScript(event)">
+                    <div class="parameters-form" id="parameters-container">
+                        <!-- Parameters will be inserted here -->
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="take-screenshot" checked>
+                            Take screenshot after execution
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="run-btn">
+                        ▶️ Run Script
+                    </button>
+                </form>
+
+                <div class="spinner" id="spinner">
+                    <div class="spinner-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <p style="margin-top: 10px; color: #666;">Executing script...</p>
+                </div>
+
+                <div class="execution-result" id="execution-result">
+                    <div class="result-header">
+                        <h3>Result</h3>
+                        <button class="btn btn-secondary" onclick="document.getElementById('execution-result').style.display='none'">
+                            Close
+                        </button>
+                    </div>
+                    <div class="result-content" id="result-content"></div>
+                    <div id="screenshots-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+class ScriptRunner {
+    constructor() {
+        this.scripts = [];
+        this.selectedScript = null;
+        this.loadScripts();
+    }
+
+    async loadScripts() {
+        try {
+            const response = await apiClient.get('scripts');
+            this.scripts = response.scripts;
+            this.renderScriptsList();
+        } catch (error) {
+            this.showMessage('Failed to load scripts: ' + error.message, 'error');
+        }
+    }
+
+    renderScriptsList() {
+        const select = document.getElementById('script-select');
+
+        if (this.scripts.length === 0) {
+            select.innerHTML = '<option value="">No scripts available</option>';
+            return;
+        }
+
+        select.innerHTML = '<option value="">-- Select a script --</option>' +
+            this.scripts.map(script =>
+                `<option value="${script.name}">${script.name} - ${script.description}</option>`
+            ).join('');
+    }
+
+    async loadScriptDetails() {
+        const scriptName = document.getElementById('script-select').value;
+
+        if (!scriptName) {
+            document.getElementById('script-info').style.display = 'none';
+            document.getElementById('execution-form').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'block';
+            return;
+        }
+
+        try {
+            const script = await apiClient.get(`scripts/${scriptName}`);
+            this.selectedScript = script;
+
+            // Show script info
+            document.getElementById('info-description').textContent = script.description;
+            document.getElementById('info-param-count').textContent = script.parameters.length;
+            document.getElementById('info-exec-count').textContent = script.execution_count;
+            document.getElementById('info-tags').textContent = script.tags.join(', ') || 'None';
+            document.getElementById('script-info').style.display = 'block';
+
+            // Show execution form
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('execution-form').style.display = 'block';
+
+            // Render parameters
+            this.renderParameters(script.parameters);
+
+        } catch (error) {
+            this.showMessage('Failed to load script details: ' + error.message, 'error');
+        }
+    }
+
+    renderParameters(parameters) {
+        const container = document.getElementById('parameters-container');
+
+        if (parameters.length === 0) {
+            container.innerHTML = '<p style="color: #666;">This script has no parameters.</p>';
+            return;
+        }
+
+        container.innerHTML = parameters.map(param => `
+            <div class="parameter-field">
+                <label>
+                    ${param.name} ${param.required ? '<span style="color: red;">*</span>' : ''}
+                </label>
+                <input
+                    type="${param.type === 'password' ? 'password' : 'text'}"
+                    id="param-${param.name}"
+                    ${param.required ? 'required' : ''}
+                    placeholder="${param.default_value || ''}"
+                >
+                ${param.description ? `<small>${param.description}</small>` : ''}
+            </div>
+        `).join('');
+    }
+
+    async executeScript(event) {
+        event.preventDefault();
+
+        const scriptName = this.selectedScript.name;
+        const takeScreenshot = document.getElementById('take-screenshot').checked;
+
+        // Collect parameters
+        const parameters = {};
+        this.selectedScript.parameters.forEach(param => {
+            const value = document.getElementById(`param-${param.name}`).value;
+            if (value) {
+                parameters[param.name] = value;
+            } else if (param.default_value) {
+                parameters[param.name] = param.default_value;
+            }
+        });
+
+        // Show spinner
+        document.getElementById('run-btn').disabled = true;
+        document.getElementById('spinner').style.display = 'block';
+        document.getElementById('execution-result').style.display = 'none';
+
+        try {
+            const response = await apiClient.post('scripts/execute', {
+                script_name: scriptName,
+                parameters: parameters,
+                take_screenshot: takeScreenshot
+            });
+
+            // Hide spinner
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('run-btn').disabled = false;
+
+            // Show result
+            document.getElementById('result-content').textContent = response.response;
+
+            // Show screenshots if available
+            const screenshotsContainer = document.getElementById('screenshots-container');
+            screenshotsContainer.innerHTML = '';
+
+            if (response.execution_result && response.execution_result.screenshot_data) {
+                response.execution_result.screenshot_data.forEach(screenshot => {
+                    const div = document.createElement('div');
+                    div.className = 'screenshot-container';
+                    div.innerHTML = `
+                        <img src="data:image/png;base64,${screenshot.data}"
+                             alt="${screenshot.filename}"
+                             onclick="window.open(this.src, '_blank')">
+                        <div class="screenshot-label">📸 ${screenshot.filename}</div>
+                    `;
+                    screenshotsContainer.appendChild(div);
+                });
+            }
+
+            document.getElementById('execution-result').style.display = 'block';
+            this.showMessage('✅ Script executed successfully!', 'success');
+
+            // Reload scripts to update execution count
+            this.loadScripts();
+
+        } catch (error) {
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('run-btn').disabled = false;
+            this.showMessage('❌ Execution failed: ' + error.message, 'error');
+        }
+    }
+
+    showMessage(text, type) {
+        const msg = document.getElementById('status-message');
+        msg.textContent = text;
+        msg.className = 'status-message ' + type;
+        msg.style.display = 'block';
+
+        setTimeout(() => {
+            msg.style.display = 'none';
+        }, 5000);
+    }
+}
+
+// Initialize
+const scriptRunner = new ScriptRunner();
+</script>
+{% endblock %}

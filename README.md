@@ -1,10 +1,11 @@
-# 🤖 AI Automation System v2.0
+# 🤖 AI Automation System v2.1
 
-**Production-ready automation system for OpenEMIS** with safe command execution, JWT authentication, and AI-powered learning.
+**Production-ready automation system for OpenEMIS** with safe command execution, JWT authentication, AI-powered learning, and **reusable script library**.
 
 [![Security](https://img.shields.io/badge/security-production--ready-green)]()
 [![Architecture](https://img.shields.io/badge/architecture-microservices-blue)]()
 [![AI](https://img.shields.io/badge/AI-DeepSeek%20V2-purple)]()
+[![Version](https://img.shields.io/badge/version-2.1.0-blue)]()
 
 ## 🎯 Key Features
 
@@ -22,6 +23,15 @@
 - ✅ **Learning Mechanism** - Saves executions to JSONL
 - ✅ **Prompt Versioning** - Editable via admin panel
 - ✅ **Error Recovery** - Retry logic with feedback
+
+### 📚 Script Library (NEW in v2.1) 🎉
+- ✅ **Reusable Scripts** - Define automation once, use forever
+- ✅ **Natural Language Execution** - Say "run login" in chat
+- ✅ **Script Chaining** - Combine scripts with AI actions
+- ✅ **Parameter Support** - Scripts accept dynamic inputs
+- ✅ **Variable Substitution** - Auto-uses saved user variables
+- ✅ **Execution Tracking** - Monitor script usage stats
+- 📖 **[Full Documentation](docs/SCRIPT_LIBRARY.md)**
 
 ### 🏗️ Modern Architecture
 - ✅ **FastAPI Backend** - High-performance async API
