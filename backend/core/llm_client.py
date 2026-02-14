@@ -188,8 +188,8 @@ Example format:
             "messages": messages,
             "temperature": temperature,
             "max_tokens": 2000,
-            # Request JSON format if supported by DeepSeek
-            # "response_format": {"type": "json_object"}  # Uncomment if supported
+            # Request JSON format (forces model to output valid JSON)
+            "response_format": {"type": "json_object"}
         }
 
         try:

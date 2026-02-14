@@ -60,7 +60,7 @@ class AutomationEngine:
     to pre-written, tested handlers.
     """
 
-    def __init__(self, headless: bool = False):
+    def __init__(self, headless: bool = True):
         self.headless = headless
         self.playwright = None
         self.browser: Optional[Browser] = None
@@ -74,10 +74,9 @@ class AutomationEngine:
         """Initialize Playwright browser"""
         self.playwright = await async_playwright().start()
 
-        # Use system Chrome to avoid macOS Monterey compatibility issues
+        # Launch Chrome in headless mode (required for Docker environment)
         self.browser = await self.playwright.chromium.launch(
-            headless=self.headless,
-            channel="chrome"
+            headless=self.headless
         )
 
         self.context = await self.browser.new_context(

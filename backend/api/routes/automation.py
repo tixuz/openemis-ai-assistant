@@ -78,9 +78,9 @@ async def execute_automation_endpoint(
         # Serialize commands for response
         commands_json = [cmd.model_dump() for cmd in commands]
 
-        # Execute if auto_execute is True
+        # Execute if auto_execute is True (headless=True for Docker environment)
         if automation_req.auto_execute:
-            result = await execute_automation(commands, headless=False)
+            result = await execute_automation(commands, headless=True)
 
             # Save successful execution to learning store
             if result.success:

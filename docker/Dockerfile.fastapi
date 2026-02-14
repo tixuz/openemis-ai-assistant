@@ -3,12 +3,30 @@ FROM python:3.13-slim
 LABEL maintainer="AI Automation System"
 LABEL version="2.0.0"
 
-# Install system dependencies for Playwright
+# Install system dependencies for Playwright and Chrome
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     ca-certificates \
     fonts-liberation \
+    fonts-noto-color-emoji \
+    fonts-unifont \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -18,18 +36,23 @@ COPY requirements-backend.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-backend.txt
 
-# Note: Playwright will use host's Chrome browser via channel="chrome"
-# No need to install Playwright browsers in Docker for now
+# Create directory for Playwright browsers in shared location
+RUN mkdir -p /opt/ms-playwright && chmod -R 755 /opt/ms-playwright
+
+# Install Playwright Chromium to shared location
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN playwright install chromium
 
 # Copy application code
 COPY backend/ ./backend/
 COPY data/ ./data/
 
-# Create non-root user
+# Create non-root user and give access to Playwright browsers
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app && \
     mkdir -p /app/logs/screenshots && \
-    chown -R appuser:appuser /app/logs
+    chown -R appuser:appuser /app/logs && \
+    chmod -R 755 /opt/ms-playwright
 
 USER appuser
 

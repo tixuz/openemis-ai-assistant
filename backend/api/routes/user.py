@@ -72,8 +72,8 @@ async def chat(
                 examples=[ex.model_dump() for ex in similar_examples]
             )
 
-            # Execute commands
-            result = await execute_automation(commands, headless=False)
+            # Execute commands (headless=True for Docker environment)
+            result = await execute_automation(commands, headless=True)
 
             # Save successful execution
             if result.success:
