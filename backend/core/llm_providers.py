@@ -341,7 +341,11 @@ class GeminiProvider(BaseLLMProvider):
 
         try:
             response = requests.post(
-                f"{self.api_url}?key={self.api_key}",
+                self.api_url,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-goog-api-key": self.api_key
+                },
                 json=payload,
                 timeout=self.timeout
             )
@@ -360,7 +364,11 @@ class GeminiProvider(BaseLLMProvider):
         """Test Gemini API connection"""
         try:
             response = requests.post(
-                f"{self.api_url}?key={self.api_key}",
+                self.api_url,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-goog-api-key": self.api_key
+                },
                 json={
                     "contents": [{"parts": [{"text": "test"}]}],
                     "generationConfig": {"maxOutputTokens": 10}
