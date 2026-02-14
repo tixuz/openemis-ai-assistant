@@ -19,8 +19,8 @@ class LLMProviderConfig(BaseModel):
 
     # Local provider settings
     server_url: Optional[str] = Field(
-        default="http://localhost:8080/v1/chat/completions",
-        description="URL for local LLM server"
+        default="http://host.docker.internal:8080/v1/chat/completions",
+        description="URL for local LLM server (use host.docker.internal from Docker)"
     )
 
     # API provider settings
