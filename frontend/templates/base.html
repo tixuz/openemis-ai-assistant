@@ -39,6 +39,9 @@
             <a href="{{ url_for('user_chat') }}" class="nav-link {% if request.endpoint == 'user_chat' %}active{% endif %}">
                 💬 Chat
             </a>
+            <a href="{{ url_for('user_variables') }}" class="nav-link {% if request.endpoint == 'user_variables' %}active{% endif %}">
+                🔑 Variables
+            </a>
         </div>
 
         <div class="nav-menu">

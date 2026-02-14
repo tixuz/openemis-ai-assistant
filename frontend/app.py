@@ -116,6 +116,13 @@ def user_chat():
     return render_template('user/chat.html', username=session.get('username'))
 
 
+@app.route('/user/variables')
+@login_required
+def user_variables():
+    """User variables management"""
+    return render_template('user/variables.html', username=session.get('username'))
+
+
 # Admin routes
 @app.route('/admin')
 @admin_required

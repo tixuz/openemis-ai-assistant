@@ -15,6 +15,7 @@ from backend.core.automation_engine import execute_automation
 from backend.core.llm_client import LLMClient
 from backend.core.learning_store import get_learning_store
 from backend.core.history_store import get_history_store
+from backend.core.variables_store import get_variables_store
 from backend.core.prompt_manager import get_prompt_manager
 from backend.models.learning import LearningExample
 from backend.config import settings
@@ -59,12 +60,24 @@ async def chat(
         llm_client = LLMClient(server_url=settings.LLM_SERVER_URL)
         learning_store = get_learning_store()
         prompt_manager = get_prompt_manager()
+        variables_store = get_variables_store()
+
+        # Load user variables
+        user_variables = await variables_store.get_variables_dict(user.username)
 
         # Find similar examples
         similar_examples = await learning_store.find_similar(chat_req.message, limit=3)
 
-        # Build prompt
+        # Build prompt with variables information
         system_prompt = prompt_manager.build_enhanced_prompt(similar_examples)
+
+        # Add variables info to prompt if user has any
+        if user_variables:
+            variables_info = "\n\n## User Variables Available:\n"
+            variables_info += "You can use these variables in commands by referencing {variable_name}:\n"
+            for key in user_variables.keys():
+                variables_info += f"- {{{key}}}\n"
+            system_prompt += variables_info
 
         if is_action:
             # Generate and execute automation
@@ -73,6 +86,18 @@ async def chat(
                 system_prompt=system_prompt,
                 examples=[ex.model_dump() for ex in similar_examples]
             )
+
+            # Substitute variables in commands
+            if user_variables:
+                for cmd in commands:
+                    # Substitute in all string fields
+                    for field_name, field_value in cmd.model_dump().items():
+                        if isinstance(field_value, str):
+                            # Replace {variable} with actual value
+                            for var_key, var_value in user_variables.items():
+                                field_value = field_value.replace(f"{{{var_key}}}", var_value)
+                            # Update the field
+                            setattr(cmd, field_name, field_value)
 
             # Execute commands (headless=True for Docker environment)
             result = await execute_automation(commands, headless=True)

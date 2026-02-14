@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}My Variables - AI Automation{% endblock %}
+
+{% block extra_css %}
+<style>
+    .variables-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .page-header {
+        margin-bottom: 30px;
+    }
+
+    .page-header h2 {
+        margin: 0 0 10px 0;
+        color: #333;
+    }
+
+    .page-header p {
+        color: #666;
+        margin: 0;
+    }
+
+    .add-variable-form {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 2fr 120px 100px;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-group label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 5px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #2196f3;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #2196f3;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #1976d2;
+    }
+
+    .btn-danger {
+        background: #f44336;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #d32f2f;
+    }
+
+    .variables-list {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .variables-list h3 {
+        padding: 15px 20px;
+        margin: 0;
+        background: #f5f5f5;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .variable-item {
+        padding: 15px 20px;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .variable-item:last-child {
+        border-bottom: none;
+    }
+
+    .variable-key {
+        font-weight: 600;
+        color: #2196f3;
+        min-width: 150px;
+        font-family: 'Monaco', 'Courier New', monospace;
+    }
+
+    .variable-value {
+        flex: 1;
+        color: #666;
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 13px;
+    }
+
+    .variable-type {
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .variable-description {
+        color: #999;
+        font-size: 12px;
+        font-style: italic;
+    }
+
+    .variable-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-small {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .empty-state {
+        padding: 40px 20px;
+        text-align: center;
+        color: #999;
+    }
+
+    .usage-hint {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+
+    .usage-hint strong {
+        color: #856404;
+    }
+
+    .usage-hint code {
+        background: #fff;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Monaco', 'Courier New', monospace;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="variables-container">
+    <div class="page-header">
+        <h2>🔑 My Variables</h2>
+        <p>Save reusable values like credentials, selectors, and URLs</p>
+    </div>
+
+    <div class="usage-hint">
+        <strong>💡 How to use:</strong> Save variables like <code>{username}</code>, <code>{password}</code>, <code>{school_code}</code>,
+        then use them in chat: <em>"Login to my school with {username} and {password}"</em>
+    </div>
+
+    <div class="add-variable-form">
+        <h3>➕ Add New Variable</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Key *</label>
+                <input type="text" id="var-key" placeholder="username" required>
+            </div>
+            <div class="form-group">
+                <label>Type *</label>
+                <select id="var-type">
+                    <option value="text">Text</option>
+                    <option value="password">Password</option>
+                    <option value="url">URL</option>
+                    <option value="selector">Selector</option>
+                    <option value="number">Number</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Value *</label>
+                <input type="text" id="var-value" placeholder="admin" required>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <input type="text" id="var-description" placeholder="Optional">
+            </div>
+            <div class="form-group">
+                <label>&nbsp;</label>
+                <button class="btn btn-primary" onclick="addVariable()">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="variables-list">
+        <h3>📋 Saved Variables</h3>
+        <div id="variables-container">
+            <div class="empty-state">Loading variables...</div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let variables = [];
+
+// Load variables on page load
+async function loadVariables() {
+    try {
+        const response = await apiClient.get('user/variables');
+        variables = response.variables;
+        renderVariables();
+    } catch (error) {
+        document.getElementById('variables-container').innerHTML =
+            '<div class="empty-state">Failed to load variables: ' + error.message + '</div>';
+    }
+}
+
+// Render variables list
+function renderVariables() {
+    const container = document.getElementById('variables-container');
+
+    if (variables.length === 0) {
+        container.innerHTML = '<div class="empty-state">No variables saved yet. Add one above!</div>';
+        return;
+    }
+
+    container.innerHTML = variables.map(v => `
+        <div class="variable-item">
+            <div class="variable-key">{${v.key}}</div>
+            <div class="variable-value">${v.value}</div>
+            <div class="variable-type">${v.type}</div>
+            ${v.description ? `<div class="variable-description">${v.description}</div>` : ''}
+            <div class="variable-actions">
+                <button class="btn btn-danger btn-small" onclick="deleteVariable('${v.key}')">Delete</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Add variable
+async function addVariable() {
+    const key = document.getElementById('var-key').value.trim();
+    const value = document.getElementById('var-value').value.trim();
+    const type = document.getElementById('var-type').value;
+    const description = document.getElementById('var-description').value.trim();
+
+    if (!key || !value) {
+        alert('Key and Value are required!');
+        return;
+    }
+
+    try {
+        await apiClient.post('user/variables', {
+            key: key,
+            value: value,
+            type: type,
+            description: description || null
+        });
+
+        // Clear form
+        document.getElementById('var-key').value = '';
+        document.getElementById('var-value').value = '';
+        document.getElementById('var-description').value = '';
+
+        // Reload variables
+        await loadVariables();
+
+        alert(`✅ Variable {${key}} saved successfully!`);
+    } catch (error) {
+        alert('❌ Failed to add variable: ' + error.message);
+    }
+}
+
+// Delete variable
+async function deleteVariable(key) {
+    if (!confirm(`Delete variable {${key}}?`)) {
+        return;
+    }
+
+    try {
+        await apiClient.delete(`user/variables/${key}`);
+        await loadVariables();
+        alert(`✅ Variable {${key}} deleted`);
+    } catch (error) {
+        alert('❌ Failed to delete variable: ' + error.message);
+    }
+}
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadVariables);
+</script>
+{% endblock %}
