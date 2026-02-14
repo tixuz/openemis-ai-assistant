@@ -1,0 +1,656 @@
+{% extends "base.html" %}
+
+{% block title %}LLM Configuration - Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .llm-config-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .config-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .current-provider {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 16px;
+        background: #e8f5e9;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .current-provider .status-dot {
+        width: 8px;
+        height: 8px;
+        background: #4caf50;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .config-form {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .form-section {
+        margin-bottom: 25px;
+    }
+
+    .form-section label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #333;
+    }
+
+    .form-section .help-text {
+        font-size: 13px;
+        color: #666;
+        margin-top: 4px;
+    }
+
+    .provider-select {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 15px;
+        background: white;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    .provider-select:focus {
+        outline: none;
+        border-color: #2196f3;
+    }
+
+    .provider-card {
+        display: none;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+
+    .provider-card.active {
+        display: block;
+        animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .provider-info {
+        display: flex;
+        align-items: start;
+        gap: 15px;
+        padding: 15px;
+        background: white;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border-left: 4px solid #2196f3;
+    }
+
+    .provider-info-icon {
+        font-size: 24px;
+    }
+
+    .provider-info-text h4 {
+        margin: 0 0 5px 0;
+        font-size: 16px;
+    }
+
+    .provider-info-text p {
+        margin: 0;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .input-field {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+        outline: none;
+        border-color: #2196f3;
+    }
+
+    .input-group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-top: 15px;
+    }
+
+    .btn-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 25px;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #2196f3;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #1976d2;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+    }
+
+    .btn-secondary {
+        background: #f5f5f5;
+        color: #333;
+    }
+
+    .btn-secondary:hover {
+        background: #e0e0e0;
+    }
+
+    .btn-test {
+        background: #ff9800;
+        color: white;
+    }
+
+    .btn-test:hover {
+        background: #f57c00;
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .alert {
+        padding: 15px 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: none;
+        animation: slideDown 0.3s;
+    }
+
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .alert.show {
+        display: block;
+    }
+
+    .alert-success {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border-left: 4px solid #4caf50;
+    }
+
+    .alert-error {
+        background: #ffebee;
+        color: #c62828;
+        border-left: 4px solid #f44336;
+    }
+
+    .alert-info {
+        background: #e3f2fd;
+        color: #1565c0;
+        border-left: 4px solid #2196f3;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .api-key-input {
+        position: relative;
+    }
+
+    .api-key-toggle {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="llm-config-container">
+    <div class="config-header">
+        <div>
+            <h1>🤖 LLM Provider Configuration</h1>
+            <p style="color: #666; margin-top: 8px;">Choose and configure your AI language model provider</p>
+        </div>
+        <div class="current-provider" id="currentProvider">
+            <span class="status-dot"></span>
+            <span>Loading...</span>
+        </div>
+    </div>
+
+    <div id="alertContainer"></div>
+
+    <div class="config-form">
+        <form id="llmConfigForm">
+            <div class="form-section">
+                <label for="providerSelect">Select LLM Provider</label>
+                <select id="providerSelect" class="provider-select" name="provider">
+                    <option value="">Loading providers...</option>
+                </select>
+                <p class="help-text">Choose between local self-hosted LLM or cloud API providers</p>
+            </div>
+
+            <!-- Local Provider Card -->
+            <div id="card-local" class="provider-card">
+                <div class="provider-info">
+                    <span class="provider-info-icon">🏠</span>
+                    <div class="provider-info-text">
+                        <h4>Local LLM Server</h4>
+                        <p>Self-hosted model running on your server (llama.cpp)</p>
+                    </div>
+                </div>
+                <div class="form-section">
+                    <label for="localServerUrl">Server URL</label>
+                    <input type="text" id="localServerUrl" class="input-field"
+                           value="http://localhost:8080/v1/chat/completions"
+                           placeholder="http://localhost:8080/v1/chat/completions">
+                    <p class="help-text">URL of your local LLM server endpoint</p>
+                </div>
+            </div>
+
+            <!-- Claude Provider Card -->
+            <div id="card-claude" class="provider-card">
+                <div class="provider-info">
+                    <span class="provider-info-icon">🤖</span>
+                    <div class="provider-info-text">
+                        <h4>Claude (Anthropic)</h4>
+                        <p>Advanced AI models from Anthropic. Get API key at console.anthropic.com</p>
+                    </div>
+                </div>
+                <div class="form-section">
+                    <label for="claudeApiKey">API Key</label>
+                    <div class="api-key-input">
+                        <input type="password" id="claudeApiKey" class="input-field"
+                               placeholder="sk-ant-...">
+                        <button type="button" class="api-key-toggle" onclick="togglePassword('claudeApiKey')">👁️</button>
+                    </div>
+                    <p class="help-text">Your Anthropic API key (starts with sk-ant-)</p>
+                </div>
+                <div class="form-section">
+                    <label for="claudeModel">Model</label>
+                    <select id="claudeModel" class="provider-select">
+                        <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Recommended)</option>
+                        <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
+                        <option value="claude-opus-4">Claude Opus 4 (Most Capable)</option>
+                        <option value="claude-3-opus-20240229">Claude 3 Opus (Legacy)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Gemini Provider Card -->
+            <div id="card-gemini" class="provider-card">
+                <div class="provider-info">
+                    <span class="provider-info-icon">🌟</span>
+                    <div class="provider-info-text">
+                        <h4>Gemini (Google)</h4>
+                        <p>Google's latest AI models. Get API key at aistudio.google.com/apikey</p>
+                    </div>
+                </div>
+                <div class="form-section">
+                    <label for="geminiApiKey">API Key</label>
+                    <div class="api-key-input">
+                        <input type="password" id="geminiApiKey" class="input-field"
+                               placeholder="AIza...">
+                        <button type="button" class="api-key-toggle" onclick="togglePassword('geminiApiKey')">👁️</button>
+                    </div>
+                    <p class="help-text">Your Google AI API key</p>
+                </div>
+                <div class="form-section">
+                    <label for="geminiModel">Model</label>
+                    <select id="geminiModel" class="provider-select">
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast & Efficient)</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Most Capable)</option>
+                        <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- OpenAI Provider Card -->
+            <div id="card-openai" class="provider-card">
+                <div class="provider-info">
+                    <span class="provider-info-icon">💬</span>
+                    <div class="provider-info-text">
+                        <h4>ChatGPT (OpenAI)</h4>
+                        <p>Industry-standard GPT models. Get API key at platform.openai.com/api-keys</p>
+                    </div>
+                </div>
+                <div class="form-section">
+                    <label for="openaiApiKey">API Key</label>
+                    <div class="api-key-input">
+                        <input type="password" id="openaiApiKey" class="input-field"
+                               placeholder="sk-...">
+                        <button type="button" class="api-key-toggle" onclick="togglePassword('openaiApiKey')">👁️</button>
+                    </div>
+                    <p class="help-text">Your OpenAI API key (starts with sk-)</p>
+                </div>
+                <div class="form-section">
+                    <label for="openaiModel">Model</label>
+                    <select id="openaiModel" class="provider-select">
+                        <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cost-Effective)</option>
+                        <option value="gpt-4o">GPT-4o (Most Capable)</option>
+                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Advanced Settings -->
+            <div class="form-section">
+                <label>Advanced Settings</label>
+                <div class="input-group">
+                    <div>
+                        <label for="timeout" style="font-weight: normal;">Timeout (seconds)</label>
+                        <input type="number" id="timeout" class="input-field"
+                               value="180" min="10" max="600">
+                    </div>
+                    <div>
+                        <label for="temperature" style="font-weight: normal;">Temperature</label>
+                        <input type="number" id="temperature" class="input-field"
+                               value="0.2" min="0" max="2" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button type="button" id="testBtn" class="btn btn-test" onclick="testConnection()">
+                    🔌 Test Connection
+                </button>
+                <button type="submit" id="saveBtn" class="btn btn-primary">
+                    💾 Save Configuration
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="loadCurrentConfig()">
+                    🔄 Reset
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let providersData = [];
+let currentConfig = null;
+
+// Load providers and current config on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadProviders();
+    await loadCurrentConfig();
+});
+
+async function loadProviders() {
+    try {
+        const response = await fetch('/api/proxy/admin/llm-config/providers', {
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to load providers');
+
+        const data = await response.json();
+        providersData = data.providers;
+
+        // Populate provider select
+        const select = document.getElementById('providerSelect');
+        select.innerHTML = providersData.map(p =>
+            `<option value="${p.id}">${p.name}</option>`
+        ).join('');
+
+    } catch (error) {
+        showAlert('Error loading providers: ' + error.message, 'error');
+    }
+}
+
+async function loadCurrentConfig() {
+    try {
+        const response = await fetch('/api/proxy/admin/llm-config', {
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to load config');
+
+        currentConfig = await response.json();
+
+        // Update UI
+        document.getElementById('currentProvider').innerHTML = `
+            <span class="status-dot"></span>
+            <span>${getProviderName(currentConfig.provider)}</span>
+        `;
+
+        // Set form values
+        document.getElementById('providerSelect').value = currentConfig.provider;
+        showProviderCard(currentConfig.provider);
+
+        // Set provider-specific values
+        if (currentConfig.provider === 'local') {
+            document.getElementById('localServerUrl').value = currentConfig.server_url || '';
+        } else if (currentConfig.provider === 'claude') {
+            document.getElementById('claudeModel').value = currentConfig.model || '';
+        } else if (currentConfig.provider === 'gemini') {
+            document.getElementById('geminiModel').value = currentConfig.model || '';
+        } else if (currentConfig.provider === 'openai') {
+            document.getElementById('openaiModel').value = currentConfig.model || '';
+        }
+
+        // Set advanced settings
+        document.getElementById('timeout').value = currentConfig.timeout || 180;
+        document.getElementById('temperature').value = currentConfig.temperature || 0.2;
+
+    } catch (error) {
+        showAlert('Error loading config: ' + error.message, 'error');
+    }
+}
+
+// Handle provider selection change
+document.getElementById('providerSelect').addEventListener('change', (e) => {
+    showProviderCard(e.target.value);
+});
+
+function showProviderCard(providerId) {
+    // Hide all cards
+    document.querySelectorAll('.provider-card').forEach(card => {
+        card.classList.remove('active');
+    });
+
+    // Show selected card
+    const card = document.getElementById(`card-${providerId}`);
+    if (card) {
+        card.classList.add('active');
+    }
+}
+
+// Handle form submission
+document.getElementById('llmConfigForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await saveConfiguration();
+});
+
+async function saveConfiguration() {
+    const saveBtn = document.getElementById('saveBtn');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<span class="spinner"></span> Saving...';
+    saveBtn.disabled = true;
+
+    try {
+        const config = buildConfigFromForm();
+
+        const response = await fetch('/api/proxy/admin/llm-config', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Save failed');
+        }
+
+        const result = await response.json();
+        showAlert(`✅ Configuration saved! Using ${result.provider} provider.`, 'success');
+
+        // Reload current config
+        await loadCurrentConfig();
+
+    } catch (error) {
+        showAlert('❌ ' + error.message, 'error');
+    } finally {
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+    }
+}
+
+async function testConnection() {
+    const testBtn = document.getElementById('testBtn');
+    const originalText = testBtn.innerHTML;
+    testBtn.innerHTML = '<span class="spinner"></span> Testing...';
+    testBtn.disabled = true;
+
+    try {
+        const config = buildConfigFromForm();
+
+        const response = await fetch('/api/proxy/admin/llm-config/test', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert(`✅ ${result.message}`, 'success');
+        } else {
+            showAlert(`❌ Connection failed: ${result.detail}`, 'error');
+        }
+
+    } catch (error) {
+        showAlert('❌ Test failed: ' + error.message, 'error');
+    } finally {
+        testBtn.innerHTML = originalText;
+        testBtn.disabled = false;
+    }
+}
+
+function buildConfigFromForm() {
+    const provider = document.getElementById('providerSelect').value;
+    const config = {
+        provider: provider,
+        timeout: parseInt(document.getElementById('timeout').value),
+        temperature: parseFloat(document.getElementById('temperature').value),
+        enabled: true
+    };
+
+    if (provider === 'local') {
+        config.server_url = document.getElementById('localServerUrl').value;
+    } else if (provider === 'claude') {
+        config.api_key = document.getElementById('claudeApiKey').value;
+        config.model = document.getElementById('claudeModel').value;
+    } else if (provider === 'gemini') {
+        config.api_key = document.getElementById('geminiApiKey').value;
+        config.model = document.getElementById('geminiModel').value;
+    } else if (provider === 'openai') {
+        config.api_key = document.getElementById('openaiApiKey').value;
+        config.model = document.getElementById('openaiModel').value;
+    }
+
+    return config;
+}
+
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    field.type = field.type === 'password' ? 'text' : 'password';
+}
+
+function showAlert(message, type) {
+    const container = document.getElementById('alertContainer');
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} show`;
+    alert.textContent = message;
+
+    container.innerHTML = '';
+    container.appendChild(alert);
+
+    setTimeout(() => {
+        alert.classList.remove('show');
+        setTimeout(() => alert.remove(), 300);
+    }, 5000);
+}
+
+function getProviderName(providerId) {
+    const provider = providersData.find(p => p.id === providerId);
+    return provider ? provider.name : providerId;
+}
+
+function getToken() {
+    return localStorage.getItem('access_token') || '';
+}
+</script>
+{% endblock %}

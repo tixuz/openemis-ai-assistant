@@ -29,6 +29,9 @@
                 <a href="{{ url_for('admin_analytics') }}" class="nav-link {% if request.endpoint == 'admin_analytics' %}active{% endif %}">
                     📈 Analytics
                 </a>
+                <a href="{{ url_for('admin_llm_config') }}" class="nav-link {% if request.endpoint == 'admin_llm_config' %}active{% endif %}">
+                    🤖 LLM Config
+                </a>
                 <span class="nav-divider">|</span>
             {% endif %}
 

@@ -145,6 +145,13 @@ def admin_analytics():
     return render_template('admin/analytics.html', username=session.get('username'))
 
 
+@app.route('/admin/llm-config')
+@admin_required
+def admin_llm_config():
+    """LLM provider configuration"""
+    return render_template('admin/llm_config.html', username=session.get('username'))
+
+
 # API Proxy routes (to avoid CORS issues from frontend)
 @app.route('/api/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @login_required
