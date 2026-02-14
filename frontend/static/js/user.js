@@ -7,6 +7,7 @@ class ChatInterface {
         this.sendBtn = document.getElementById('send-btn');
 
         this.setupEventListeners();
+        this.loadHistory();
     }
 
     setupEventListeners() {
@@ -18,6 +19,44 @@ class ChatInterface {
                 this.sendMessage();
             }
         });
+    }
+
+    async loadHistory() {
+        try {
+            // Load recent chat history
+            const response = await apiClient.get('user/history', { limit: 50 });
+
+            if (response.history && response.history.length > 0) {
+                // Clear welcome message
+                this.chatOutput.innerHTML = '';
+
+                // Add history messages (already sorted newest first from API)
+                // Reverse to show oldest first
+                const messages = response.history.reverse();
+
+                messages.forEach(msg => {
+                    // Add user message
+                    this.addMessage('user', msg.message, { fromHistory: true });
+
+                    // Add AI response
+                    const options = {
+                        scrollable: msg.response.length > 200,
+                        fromHistory: true
+                    };
+
+                    if (msg.execution_result) {
+                        options.executionResult = msg.execution_result;
+                    }
+
+                    this.addMessage('ai', msg.response, options);
+                });
+
+                this.scrollToBottom();
+            }
+        } catch (error) {
+            console.error('Failed to load history:', error);
+            // Keep welcome message on error
+        }
     }
 
     async sendMessage() {

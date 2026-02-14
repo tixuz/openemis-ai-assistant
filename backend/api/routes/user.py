@@ -9,10 +9,12 @@ from slowapi.util import get_remote_address
 
 from backend.models.api_schemas import ChatRequest, ChatResponse
 from backend.models.auth import User
+from backend.models.history import ChatMessage
 from backend.api.dependencies import require_authenticated
 from backend.core.automation_engine import execute_automation
 from backend.core.llm_client import LLMClient
 from backend.core.learning_store import get_learning_store
+from backend.core.history_store import get_history_store
 from backend.core.prompt_manager import get_prompt_manager
 from backend.models.learning import LearningExample
 from backend.config import settings
@@ -96,6 +98,19 @@ async def chat(
             else:
                 response_text = f"❌ Automation failed: {result.error}"
 
+            # Save to conversation history
+            history_store = get_history_store()
+            chat_message = ChatMessage(
+                user_id=user.user_id,
+                username=user.username,
+                message=chat_req.message,
+                response=response_text,
+                commands_generated=len(commands),
+                executed=True,
+                execution_result=result.to_dict()
+            )
+            await history_store.save_message(chat_message)
+
             return ChatResponse(
                 response=response_text,
                 commands_generated=len(commands),
@@ -113,6 +128,17 @@ async def chat(
             response_text += "- Click the add button\n"
             response_text += "- Fill the form with data"
 
+            # Save to conversation history
+            history_store = get_history_store()
+            chat_message = ChatMessage(
+                user_id=user.user_id,
+                username=user.username,
+                message=chat_req.message,
+                response=response_text,
+                executed=False
+            )
+            await history_store.save_message(chat_message)
+
             return ChatResponse(
                 response=response_text,
                 executed=False
@@ -128,19 +154,43 @@ async def chat(
 @router.get("/history")
 async def get_chat_history(
     user: User = Depends(require_authenticated),
-    limit: int = 50
+    limit: int = 50,
+    offset: int = 0
 ):
     """
     Get user's chat/automation history.
 
-    Note: This is a placeholder for future implementation.
-    Currently returns empty list as we're not tracking per-user history yet.
+    Returns conversation history including:
+    - User messages
+    - AI responses
+    - Automation results (if any)
+    - Timestamps
 
     Args:
-        limit: Max number of history items to return
+        limit: Max number of history items to return (default: 50)
+        offset: Number of items to skip for pagination (default: 0)
 
     Returns:
-        List of chat history items
+        Dictionary with history list and total count
     """
-    # TODO: Implement per-user history tracking
-    return {"history": [], "message": "History tracking coming soon"}
+    history_store = get_history_store()
+
+    # Get user's history
+    messages = await history_store.get_user_history(
+        user_id=user.user_id,
+        limit=limit,
+        offset=offset
+    )
+
+    # Get total count
+    total = await history_store.count_user_messages(user.user_id)
+
+    # Convert to dict
+    history_data = [msg.model_dump() for msg in messages]
+
+    return {
+        "history": history_data,
+        "total": total,
+        "limit": limit,
+        "offset": offset
+    }
