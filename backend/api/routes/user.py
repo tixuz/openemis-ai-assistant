@@ -89,12 +89,39 @@ async def chat(
                 )
                 await learning_store.save_example(example)
 
-            # Format response
+            # Format response with command details
             if result.success:
                 response_text = f"✅ Automation completed successfully!\n\n"
-                response_text += f"Executed {result.commands_executed} commands in {result.execution_time_ms}ms.\n"
+                response_text += f"**Commands executed:** {result.commands_executed}\n"
+                response_text += f"**Time:** {result.execution_time_ms}ms\n\n"
+
+                # Show what was done
+                response_text += "**Actions taken:**\n"
+                for i, cmd in enumerate(commands, 1):
+                    if cmd.type == "navigate":
+                        response_text += f"{i}. 🌐 Navigated to: {cmd.url}\n"
+                    elif cmd.type == "click":
+                        response_text += f"{i}. 👆 Clicked: {cmd.selector}\n"
+                    elif cmd.type == "fill":
+                        response_text += f"{i}. ✏️ Filled: {cmd.selector} = '{cmd.value}'\n"
+                    elif cmd.type == "wait_for_navigation":
+                        response_text += f"{i}. ⏳ Waited for page load\n"
+                    elif cmd.type == "screenshot":
+                        response_text += f"{i}. 📸 Took screenshot\n"
+                    else:
+                        response_text += f"{i}. {cmd.type}\n"
+
+                # Show screenshots if any
                 if result.screenshots:
-                    response_text += f"\nScreenshots saved:\n" + "\n".join(f"- {s}" for s in result.screenshots)
+                    response_text += f"\n**Screenshots:**\n"
+                    for s in result.screenshots:
+                        response_text += f"- {s}\n"
+
+                # Show extracted data if any
+                if result.extracted_data:
+                    response_text += f"\n**Extracted data:**\n"
+                    for key, value in result.extracted_data.items():
+                        response_text += f"- {key}: {value}\n"
             else:
                 response_text = f"❌ Automation failed: {result.error}"
 
