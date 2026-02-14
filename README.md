@@ -1,11 +1,11 @@
-# 🤖 AI Automation System v2.2
+# 🤖 AI Automation System v2.2.1
 
 **Production-ready automation system for OpenEMIS** with safe command execution, JWT authentication, AI-powered learning, reusable scripts, and **true natural language workflows**.
 
 [![Security](https://img.shields.io/badge/security-production--ready-green)]()
 [![Architecture](https://img.shields.io/badge/architecture-microservices-blue)]()
 [![AI](https://img.shields.io/badge/AI-DeepSeek%20V2-purple)]()
-[![Version](https://img.shields.io/badge/version-2.2.0-blue)]()
+[![Version](https://img.shields.io/badge/version-2.2.1-blue)]()
 
 ## 🎯 Key Features
 
@@ -24,19 +24,24 @@
 - ✅ **Prompt Versioning** - Editable via admin panel
 - ✅ **Error Recovery** - Retry logic with feedback
 
-### 💬 Natural Language Workflows (NEW in v2.2) 🎉🎉
+### 💬 Natural Language Workflows (v2.2) 🎉🎉
 - ✅ **True Natural Language** - "mark attendance, john and jack missing"
 - ✅ **Intent Detection** - Understands what users want
 - ✅ **Entity Extraction** - Extracts students, dates, codes automatically
 - ✅ **Natural Responses** - "Attendance marked. Refresh to see." (no tech jargon!)
-- ✅ **Smart Priority** - Workflows → Scripts → LLM (seamless fallback)
+- ✅ **Smart 3-Tier Priority System** - Automatic execution method selection:
+  1. **Workflows** - Natural language intent detection (fastest, most user-friendly)
+  2. **Scripts** - Direct script execution (reliable, pre-defined)
+  3. **LLM** - AI-generated commands (flexible fallback for anything)
 - 📖 **[Full Documentation](docs/WORKFLOWS.md)**
 
-### 📚 Script Library (v2.1)
+### 📚 Script Library (v2.1 → v2.2.1)
 - ✅ **Reusable Scripts** - Define automation once, use forever
 - ✅ **Script Execution** - "run login" in chat
 - ✅ **Script Chaining** - Combine scripts with AI actions
 - ✅ **Parameter Support** - Scripts accept dynamic inputs
+- ✅ **Script Composition** (NEW v2.2.1) - Scripts can call other scripts as parameters
+- ✅ **Copy Functionality** (NEW v2.2.1) - Duplicate scripts to create variations
 - ✅ **Variable Substitution** - Auto-uses saved user variables
 - ✅ **Execution Tracking** - Monitor script usage stats
 - 📖 **[Full Documentation](docs/SCRIPT_LIBRARY.md)**
@@ -91,9 +96,14 @@ docker-compose up -d
 - **Backend API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 
-**Default credentials:**
+**⚠️ CRITICAL - Default Credentials:**
 - Username: `admin`
-- Password: `admin123` (⚠️ Change in production!)
+- Password: `admin123`
+
+**🚨 YOU MUST CHANGE THESE BEFORE ANY DEPLOYMENT! 🚨**
+- These are development-only credentials
+- Never use these in production or public environments
+- Update credentials in `data/users.json`
 
 ## 📖 Usage
 
@@ -101,23 +111,76 @@ docker-compose up -d
 1. Visit http://localhost:3000/login
 2. Login with credentials
 3. Go to **User Chat**
-4. Ask AI to automate tasks:
+4. Talk naturally - the system understands intent:
+
+   **Natural Language (Priority 1 - Workflows):**
+   - "mark attendance, john and jack missing"
+   - "go to institution P1002"
+   - "search for school P1002"
+
+   **Direct Script Execution (Priority 2 - Scripts):**
+   - "run login"
+   - "run openemis_login"
+
+   **Technical Commands (Priority 3 - LLM Fallback):**
    - "Login to OpenEMIS as admin"
    - "Navigate to students page"
    - "Click the add button"
 
-### Admin Panel (Prompt Engineers)
+The system automatically picks the best execution method!
+
+### Admin Panel (Prompt Engineers & Script Creators)
 1. Login as admin/prompt_engineer
 2. Access **Admin Dashboard**
-3. **Prompt Engineering**: Edit system prompts, test generations
-4. **Learning Examples**: View/manage successful automations
-5. **Analytics**: Usage statistics and performance metrics
+3. **Scripts** (`/admin/scripts`): Create reusable automation scripts
+4. **Run Script** (`/admin/run-script`): Execute scripts with parameters
+5. **Prompt Engineering**: Edit system prompts, test generations
+6. **Learning Examples**: View/manage successful automations
+7. **Analytics**: Usage statistics and performance metrics
+8. **User Variables**: Manage saved credentials and selectors
 
 ### Chrome Extension
 1. Load extension from `extension/` folder in Chrome
 2. Click 🤖 button on any webpage
 3. Chat with AI for instant automation
 4. Extension uses your Flask session token
+
+## 🎯 How It Works: The 3-Tier Priority System
+
+When you send a message, the system intelligently chooses the best execution method:
+
+### Priority 1: Natural Language Workflows (Fastest & Most User-Friendly)
+**Example:** "mark attendance, john and jack missing"
+
+1. **Intent Detection** - Recognizes this is a MARK_ATTENDANCE intent
+2. **Entity Extraction** - Extracts: students=["John", "Jack"], status="absent", date="today"
+3. **Workflow Execution** - Runs predefined script chain: login → navigate_to_attendance → mark_students
+4. **Natural Response** - Returns: "✅ Attendance marked. John and Jack marked absent for 2026-02-14. Refresh to see."
+
+**Best for:** Common tasks that teachers do repeatedly (attendance, searching, reporting)
+
+### Priority 2: Direct Script Execution (Reliable & Pre-Defined)
+**Example:** "run login" or "run openemis_login"
+
+1. **Pattern Detection** - Recognizes "run {script_name}" pattern
+2. **Script Lookup** - Finds saved script in library
+3. **Variable Substitution** - Fills in parameters from user variables
+4. **Execution** - Runs the exact commands saved in the script
+
+**Best for:** Technical tasks where you want exact control and repeatability
+
+### Priority 3: LLM Fallback (Flexible & Smart)
+**Example:** "Login to OpenEMIS as admin"
+
+1. **LLM Generation** - Asks DeepSeek to generate Playwright commands
+2. **Few-Shot Learning** - Injects similar examples from learning store
+3. **Validation** - Checks commands against whitelist (security)
+4. **Execution** - Runs generated commands
+5. **Learning** - Saves successful execution for future use
+
+**Best for:** New tasks, edge cases, or when you don't have a workflow/script defined yet
+
+**The Beauty:** You don't choose! The system automatically picks the best method for your message. Start with natural language, and the system handles the rest.
 
 ## 🏗️ Architecture
 
@@ -165,17 +228,23 @@ docker-compose up -d
 │   │   ├── llm_client.py         # LLM communication
 │   │   ├── command_parser.py     # JSON validation
 │   │   ├── learning_store.py     # Example storage
+│   │   ├── script_store.py       # Script storage (v2.1)
+│   │   ├── workflow_engine.py    # Intent detection (v2.2)
 │   │   └── prompt_manager.py     # Prompt construction
 │   ├── models/          # Pydantic models
 │   │   ├── commands.py           # Command whitelist
 │   │   ├── auth.py               # User/JWT models
-│   │   └── learning.py           # Example schema
+│   │   ├── learning.py           # Example schema
+│   │   ├── scripts.py            # Script models (v2.1)
+│   │   └── workflows.py          # Workflow models (v2.2)
 │   ├── api/             # API routes
 │   │   └── routes/
 │   │       ├── auth.py           # Authentication
 │   │       ├── automation.py     # Execute automations
-│   │       ├── user.py           # User chat
-│   │       └── admin.py          # Admin panel
+│   │       ├── user.py           # User chat (3-tier priority)
+│   │       ├── admin.py          # Admin panel
+│   │       ├── scripts.py        # Script CRUD (v2.1)
+│   │       └── variables.py      # User variables
 │   └── main.py          # FastAPI app
 
 ├── frontend/            # Flask frontend
@@ -202,8 +271,16 @@ docker-compose up -d
 
 ├── data/                # Persistent data
 │   ├── prompts/         # System prompts
-│   ├── learning/        # Example storage
+│   ├── learning/        # Example storage (JSONL)
+│   ├── scripts/         # Saved scripts (v2.1)
+│   ├── workflows/       # Workflow definitions (v2.2)
+│   ├── variables/       # User variables
+│   ├── history/         # Chat history
 │   └── users.json       # User database
+
+├── docs/                # Documentation
+│   ├── SCRIPT_LIBRARY.md   # Script system docs
+│   └── WORKFLOWS.md        # Workflow system docs
 
 ├── tests/               # Test suites
 │   ├── unit/
@@ -274,21 +351,26 @@ RUN apt-get install -y libasound2  # Required dependency
 - ✅ Headless mode enabled (`headless=True` in routes)
 - ✅ Non-root user (`appuser`) can access browsers
 
-### Mock LLM Server
-For fast testing without waiting for LLM inference:
+### Mock LLM Server (Testing Only)
+For fast testing during development without waiting for LLM inference:
 
 ```bash
-# Start mock server (returns instant responses)
+# Start mock server (returns instant hardcoded responses)
 python3 mock_llm_server.py
 
 # Access at http://localhost:8080
 ```
 
-Mock server provides hardcoded Playwright commands for:
+**⚠️ IMPORTANT: This is for TESTING ONLY!**
+- Returns hardcoded Playwright commands (not real AI)
+- Only recognizes specific test phrases
+- Use real LLM (DeepSeek/GPT) for production
+
+Mock server provides hardcoded commands for:
 - Navigation: "Open OpenEMIS" → `navigate` command
 - Login: "Login as admin" → 5 commands (navigate, fill username, fill password, click, wait)
 
-**Performance:**
+**Performance Comparison:**
 - Real LLM: ~0.6s generation time (18 tokens/sec on CPU)
 - Mock LLM: <100ms response time
 - Browser execution: ~4-9s depending on complexity
@@ -323,6 +405,24 @@ curl -X POST http://localhost:8000/admin/prompts \
 
 Full API docs: http://localhost:8000/docs
 
+## 📚 Documentation
+
+Comprehensive guides are available in the `docs/` directory:
+
+- **[SCRIPT_LIBRARY.md](docs/SCRIPT_LIBRARY.md)** - Complete guide to creating and using reusable scripts
+  - Script creation workflow
+  - Parameter types and composition
+  - Execution methods (API, UI, Chat)
+  - Security model and best practices
+
+- **[WORKFLOWS.md](docs/WORKFLOWS.md)** - Natural language workflow system
+  - Intent detection patterns
+  - Entity extraction guide
+  - Creating custom workflows
+  - Troubleshooting and examples
+
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
+
 ## 🛠️ Development
 
 ### Running Locally (Without Docker)
@@ -356,13 +456,18 @@ docker-compose down
 This project demonstrates modern AI engineering practices for portfolio/interview purposes.
 
 **Key patterns demonstrated:**
-- Safe LLM code execution (no eval/exec)
-- Structured output parsing
-- Few-shot learning with examples
-- Prompt engineering interface
-- JWT authentication & RBAC
-- Docker microservices
-- Rate limiting & security
+- ✅ **Safe LLM code execution** - No eval/exec, command whitelist only
+- ✅ **Structured output parsing** - LLM returns JSON, not code
+- ✅ **Few-shot learning** - Dynamic example injection
+- ✅ **Intent detection** - Natural language understanding
+- ✅ **Entity extraction** - Regex-based information extraction
+- ✅ **Workflow orchestration** - Multi-step automation chains
+- ✅ **Script composition** - Reusable automation building blocks
+- ✅ **Priority system** - Intelligent fallback (Workflows → Scripts → LLM)
+- ✅ **Prompt engineering interface** - Admin panel for prompt tuning
+- ✅ **JWT authentication & RBAC** - Role-based access control
+- ✅ **Docker microservices** - Multi-container architecture
+- ✅ **Rate limiting & security** - Production-ready safeguards
 
 ## 📝 License
 

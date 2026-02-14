@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.1] - 2026-02-14
+
+### Added - Script Composition & Copy 🎉
+
+**Enhanced Script Library with True Reusability**
+
+Scripts can now call other scripts and be easily duplicated!
+
+#### New Features
+- **Script as Parameter Type**: Scripts can accept other scripts as parameters for composition
+  - Example: Create a "complete_workflow" script that calls "login", "navigate_to_page", and "submit_form" scripts
+  - Enables true modular automation building blocks
+
+- **Copy Script Functionality**: One-click duplication of existing scripts
+  - Copies all parameters, commands, tags, and descriptions
+  - Automatically appends "_copy" to the name for easy identification
+  - Perfect for creating variations of similar automations
+
+#### Updated Components
+- `backend/models/scripts.py` - Added "script" to parameter type enum
+- `frontend/templates/admin/scripts.html` - Added Copy Script button and functionality
+- `frontend/templates/admin/run_script.html` - Added dropdown for script-type parameters
+
+#### Usage Examples
+```json
+{
+  "name": "complete_onboarding",
+  "parameters": [
+    {"name": "login_script", "type": "script", "required": true},
+    {"name": "setup_script", "type": "script", "required": true}
+  ],
+  "commands": [
+    {"type": "execute_script", "script_name": "{login_script}"},
+    {"type": "execute_script", "script_name": "{setup_script}"},
+    {"type": "navigate", "url": "/dashboard"}
+  ]
+}
+```
+
+#### UI Improvements
+- Script parameter dropdown shows available scripts
+- Copy button appears when editing existing scripts
+- Copied scripts automatically get "_copy" suffix
+
+---
+
 ## [2.2.0] - 2026-02-14
 
 ### Added - Natural Language Workflows 🎉🎉
