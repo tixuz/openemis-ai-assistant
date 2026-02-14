@@ -77,7 +77,7 @@ class LLMProviderConfig(BaseModel):
         provider = values.get("provider")
         defaults = {
             "claude": "claude-3-5-sonnet-20241022",
-            "gemini": "gemini-2.0-flash",
+            "gemini": "gemini-2.5-flash",  # Use 2.5 as it's more reliable
             "openai": "gpt-4o-mini"
         }
         return defaults.get(provider)

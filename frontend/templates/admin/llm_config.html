@@ -358,7 +358,7 @@
                 <div class="form-section">
                     <label>API Endpoint</label>
                     <input type="text" id="geminiEndpoint" class="input-field"
-                           value="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+                           value="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
                            readonly style="background: #f5f5f5; color: #666; font-size: 12px;">
                     <p class="help-text">Google Generative Language API endpoint (updates with model selection)</p>
                 </div>
@@ -374,8 +374,8 @@
                 <div class="form-section">
                     <label for="geminiModel">Model</label>
                     <select id="geminiModel" class="provider-select" onchange="updateGeminiEndpoint()">
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast & Efficient)</option>
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Latest)</option>
+                        <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Recommended)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast)</option>
                         <option value="gemini-2.5-pro">Gemini 2.5 Pro (Most Capable)</option>
                     </select>
                 </div>
