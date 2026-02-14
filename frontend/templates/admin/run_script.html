@@ -220,6 +220,32 @@
         padding: 60px 20px;
         color: #999;
     }
+
+    .nested-parameters {
+        margin-top: 10px;
+    }
+
+    .nested-parameters .parameter-field {
+        background: #f8f9fa;
+        padding: 8px;
+        border-left: 3px solid #2196F3;
+        margin-bottom: 8px;
+    }
+
+    .nested-parameters label {
+        font-size: 12px;
+        color: #555;
+    }
+
+    .nested-parameters input {
+        font-size: 12px;
+        padding: 6px;
+    }
+
+    .nested-parameters small {
+        font-size: 11px;
+        color: #777;
+    }
 </style>
 {% endblock %}
 
@@ -272,9 +298,15 @@
                         </label>
                     </div>
 
-                    <button type="submit" class="btn btn-primary" id="run-btn">
-                        ▶️ Run Script
-                    </button>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button type="submit" class="btn btn-primary" id="run-btn" style="flex: 1;">
+                            ▶️ Run Script
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="save-preset-btn"
+                                onclick="scriptRunner.saveAsPreset()" style="flex: 1;">
+                            💾 Save as Preset
+                        </button>
+                    </div>
                 </form>
 
                 <div class="spinner" id="spinner">
@@ -399,12 +431,16 @@ class ScriptRunner {
                         </label>
                         <select
                             id="param-${param.name}"
+                            class="script-parameter-select"
+                            data-param-name="${param.name}"
                             ${param.required ? 'required' : ''}
+                            onchange="scriptRunner.onScriptParameterChange(this)"
                         >
                             <option value="">-- Select a script --</option>
                             ${scriptOptions}
                         </select>
                         ${param.description ? `<small>${param.description}</small>` : ''}
+                        <div id="nested-params-${param.name}" class="nested-parameters"></div>
                     </div>
                 `;
             }
@@ -427,6 +463,54 @@ class ScriptRunner {
         }).join('');
     }
 
+    async onScriptParameterChange(selectElement) {
+        const scriptName = selectElement.value;
+        const paramName = selectElement.dataset.paramName;
+        const nestedContainer = document.getElementById(`nested-params-${paramName}`);
+
+        if (!scriptName) {
+            nestedContainer.innerHTML = '';
+            return;
+        }
+
+        try {
+            // Fetch the selected script details
+            const script = await apiClient.get(`scripts/${scriptName}`);
+
+            if (script.parameters && script.parameters.length > 0) {
+                // Render nested parameters
+                nestedContainer.innerHTML = `
+                    <div style="margin-left: 20px; margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 4px;">
+                        <strong>📋 ${scriptName} parameters:</strong>
+                        ${script.parameters.map(nestedParam => `
+                            <div class="parameter-field" style="margin-top: 10px;">
+                                <label style="font-size: 12px;">
+                                    ${paramName}.${nestedParam.name} ${nestedParam.required ? '<span style="color: red;">*</span>' : ''}
+                                </label>
+                                <input
+                                    type="${nestedParam.type === 'password' ? 'password' : 'text'}"
+                                    id="nested-${paramName}-${nestedParam.name}"
+                                    data-parent="${paramName}"
+                                    data-nested="${nestedParam.name}"
+                                    class="nested-parameter-input"
+                                    ${nestedParam.required ? 'required' : ''}
+                                    placeholder="${nestedParam.default_value || ''}"
+                                    style="font-size: 12px;"
+                                >
+                                ${nestedParam.description ? `<small style="font-size: 11px;">${nestedParam.description}</small>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                nestedContainer.innerHTML = '<small style="color: #666; margin-left: 20px;">No parameters needed</small>';
+            }
+        } catch (error) {
+            console.error('Failed to load nested script parameters:', error);
+            nestedContainer.innerHTML = '<small style="color: red; margin-left: 20px;">Failed to load script parameters</small>';
+        }
+    }
+
     async executeScript(event) {
         event.preventDefault();
 
@@ -441,6 +525,18 @@ class ScriptRunner {
                 parameters[param.name] = value;
             } else if (param.default_value) {
                 parameters[param.name] = param.default_value;
+            }
+        });
+
+        // Collect nested parameters (for script-type parameters)
+        const nestedInputs = document.querySelectorAll('.nested-parameter-input');
+        nestedInputs.forEach(input => {
+            const parent = input.dataset.parent;
+            const nested = input.dataset.nested;
+            const value = input.value;
+            if (value) {
+                // Store as parent.nested format
+                parameters[`${parent}.${nested}`] = value;
             }
         });
 
@@ -491,6 +587,77 @@ class ScriptRunner {
             document.getElementById('spinner').style.display = 'none';
             document.getElementById('run-btn').disabled = false;
             this.showMessage('❌ Execution failed: ' + error.message, 'error');
+        }
+    }
+
+    async saveAsPreset() {
+        if (!this.selectedScript) {
+            this.showMessage('No script selected', 'error');
+            return;
+        }
+
+        // Ask for preset name
+        const presetName = prompt(
+            `Save current configuration as a new script.\n\nOriginal: "${this.selectedScript.name}"\n\nEnter name for preset:`,
+            `${this.selectedScript.name}_preset`
+        );
+
+        if (!presetName) return;
+
+        // Validate name
+        if (!/^[a-zA-Z0-9_-]+$/.test(presetName)) {
+            this.showMessage('Invalid name. Use only letters, numbers, underscores, and hyphens.', 'error');
+            return;
+        }
+
+        try {
+            // Collect current parameter values
+            const parameterValues = {};
+            this.selectedScript.parameters.forEach(param => {
+                const value = document.getElementById(`param-${param.name}`)?.value;
+                if (value) {
+                    parameterValues[param.name] = value;
+                }
+            });
+
+            // Collect nested parameter values
+            const nestedInputs = document.querySelectorAll('.nested-parameter-input');
+            nestedInputs.forEach(input => {
+                const parent = input.dataset.parent;
+                const nested = input.dataset.nested;
+                const value = input.value;
+                if (value) {
+                    parameterValues[`${parent}.${nested}`] = value;
+                }
+            });
+
+            // Create new script with values substituted
+            let commandsJson = JSON.stringify(this.selectedScript.commands);
+
+            // Substitute all parameter values in commands
+            for (const [key, value] of Object.entries(parameterValues)) {
+                commandsJson = commandsJson.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+            }
+
+            const newScript = {
+                name: presetName,
+                description: `${this.selectedScript.description} (preset with values)`,
+                commands: JSON.parse(commandsJson),
+                parameters: [], // No parameters needed - values are hardcoded
+                tags: [...this.selectedScript.tags, 'preset'],
+                created_by: 'admin'
+            };
+
+            // Save new script
+            await apiClient.post('scripts', newScript);
+
+            this.showMessage(`✅ Preset "${presetName}" created successfully!`, 'success');
+
+            // Reload scripts list
+            await this.loadScripts();
+
+        } catch (error) {
+            this.showMessage(`❌ Failed to save preset: ${error.message}`, 'error');
         }
     }
 
