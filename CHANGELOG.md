@@ -2,6 +2,111 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2026-02-14
+
+### Added - Natural Language Workflows 🎉🎉
+
+**The "Better World" Vision - True Natural Language Automation**
+
+Teachers can now speak naturally instead of using technical commands!
+
+#### Before (Technical):
+```
+Teacher: "run login then navigate to attendance page"
+System: ✅ Executed 5 commands in 8450ms
+```
+
+#### After (Natural):
+```
+Teacher: "mark attendance, john and jack missing"
+System: ✅ Attendance marked. John and Jack marked absent. Refresh the page to see.
+```
+
+#### Core Features
+- **Intent Detection**: Recognizes user intent from natural language
+- **Entity Extraction**: Automatically extracts students, dates, codes from messages
+- **Workflow Orchestration**: Maps intents to script chains
+- **Natural Responses**: Returns human-friendly confirmations (no technical details)
+- **Priority System**: Workflows → Scripts → LLM (smart fallback)
+
+#### New Components
+- `backend/models/workflows.py` - Workflow and intent models
+- `backend/core/workflow_engine.py` - Intent detection and workflow execution
+  - `IntentDetector` - Pattern matching and entity extraction
+  - `WorkflowStore` - Workflow definition storage
+  - `WorkflowEngine` - Orchestrates workflow execution
+- `docs/WORKFLOWS.md` - Complete workflow documentation
+
+#### Supported Intents
+1. **MARK_ATTENDANCE** - "mark attendance, john and jack absent"
+   - Extracts: students, date, status
+   - Executes: login → navigate_to_attendance → mark_students
+   - Returns: "✅ Attendance marked. John, Jack marked absent for 2026-02-14. Refresh to see."
+
+2. **SEARCH_INSTITUTION** - "go to institution P1002"
+   - Extracts: institution_code
+   - Executes: login → navigate_to_institutions → search_institution
+   - Returns: "✅ Found institution P1002. Displaying details."
+
+3. **CHECK_HOMEWORK** (Planned) - "check who submitted math homework"
+4. **EXPORT_GRADES** (Planned) - "export grades for class 5A"
+
+#### Entity Extraction Capabilities
+- **Student Names**: "john and jack", "John Smith", "john, jack, and mary"
+- **Dates**: "today", "yesterday", "2026-02-14"
+- **Status**: "absent", "missing" → "absent"; "present" → "present"
+- **Institution Codes**: "P1002", "P-1002"
+
+#### Chat Integration
+Enhanced `backend/api/routes/user.py` with priority system:
+1. **Try Workflow** - Natural language intent detection
+2. **Try Script** - Direct script execution ("run login")
+3. **Try LLM** - Generate commands for unknown requests
+
+#### Updated Components
+- `backend/api/routes/user.py` - Added workflow engine integration
+
+#### Workflow Definition Format
+```json
+{
+  "intent_type": "MARK_ATTENDANCE",
+  "steps": [
+    {"script_name": "login", "parameters": {}},
+    {"script_name": "mark_students", "parameters": {"students": "{students}"}}
+  ],
+  "success_message": "✅ Attendance marked. {students} marked {status}.",
+  "requires_entities": ["students", "status"]
+}
+```
+
+#### Storage
+- Workflows: `data/workflows/workflows.jsonl`
+- Intent patterns: `INTENT_PATTERNS` in code
+- Default workflows: `DEFAULT_WORKFLOWS`
+
+#### Use Cases
+```
+"mark today's attendance, john and jack are absent"
+"go to institution P1002"
+"search for school P1002"
+"mark john present"
+```
+
+### Technical Details
+- Pattern-based intent detection (keyword matching)
+- Entity extraction with regex patterns
+- In-memory workflow caching
+- Automatic variable substitution from user variables
+- Human-friendly response formatting
+
+### Documentation
+- Added `docs/WORKFLOWS.md` - Complete workflow system documentation
+- Usage examples and troubleshooting guide
+- Entity extraction patterns
+- Creating custom workflows
+
+---
+
 ## [2.1.0] - 2026-02-14
 
 ### Added - Script Library Feature 🎉

@@ -18,6 +18,7 @@ from backend.core.history_store import get_history_store
 from backend.core.variables_store import get_variables_store
 from backend.core.prompt_manager import get_prompt_manager
 from backend.core.script_store import get_script_store
+from backend.core.workflow_engine import get_workflow_engine
 from backend.models.learning import LearningExample
 from backend.models.scripts import AutomationScript
 from backend.models.commands import Command
@@ -111,11 +112,48 @@ async def chat(
         prompt_manager = get_prompt_manager()
         variables_store = get_variables_store()
         script_store = get_script_store()
+        workflow_engine = get_workflow_engine()
 
         # Load user variables
         user_variables = await variables_store.get_variables_dict(user.username)
 
-        # Check if user wants to run a saved script
+        # TRY 1: Check if this matches a workflow intent (e.g., "mark attendance, john is absent")
+        workflow_found, workflow_execution = await workflow_engine.execute_from_message(
+            chat_req.message,
+            user,
+            variables_store
+        )
+
+        if workflow_found and workflow_execution:
+            # Workflow executed! Return natural language response
+            history_store = get_history_store()
+            chat_message = ChatMessage(
+                username=user.username,
+                message=chat_req.message,
+                response=workflow_execution.message,
+                commands_generated=workflow_execution.steps_executed,
+                executed=True,
+                execution_result={
+                    "success": workflow_execution.success,
+                    "workflow_id": workflow_execution.workflow_id,
+                    "intent": workflow_execution.intent.model_dump(),
+                    "steps_executed": workflow_execution.steps_executed,
+                    "screenshot_data": workflow_execution.screenshot_data
+                }
+            )
+            await history_store.save_message(chat_message)
+
+            return ChatResponse(
+                response=workflow_execution.message,
+                commands_generated=workflow_execution.steps_executed,
+                executed=True,
+                execution_result={
+                    "success": workflow_execution.success,
+                    "screenshot_data": workflow_execution.screenshot_data
+                }
+            )
+
+        # TRY 2: Check if user wants to run a saved script
         found_script, script_commands, script_name = await detect_and_execute_script(
             chat_req.message,
             user,
