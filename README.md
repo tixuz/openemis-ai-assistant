@@ -59,7 +59,7 @@
 - Python 3.13+
 - Docker & Docker Compose
 - Chrome browser
-- DeepSeek model (or any OpenAI-compatible LLM)
+- LLM access: Local (DeepSeek, Ollama, llama.cpp) OR Cloud API (DeepSeek, Tencent Hunyuan, OpenAI, etc.)
 
 ### 1. Clone and Setup
 ```bash
@@ -74,11 +74,25 @@ cp docker/.env.example docker/.env
 ```
 
 ### 2. Start LLM Server
-```bash
-# Start your DeepSeek/LLM server
-./start_ai.sh
 
-# Or use any OpenAI-compatible endpoint on port 8080
+**Option A: Local DeepSeek (Development)**
+```bash
+# Start local DeepSeek server
+./start_ai.sh
+# Runs on http://localhost:8080
+```
+
+**Option B: Cloud API (Production)**
+```bash
+# Edit docker/.env and set:
+# LLM_SERVER_URL=https://api.deepseek.com/v1
+# LLM_API_KEY=your-api-key
+
+# Supported providers:
+# - DeepSeek: https://api.deepseek.com/v1
+# - Tencent Hunyuan: https://hunyuan.tencentcloudapi.com/v1
+# - OpenAI: https://api.openai.com/v1
+# - Or any OpenAI-compatible endpoint
 ```
 
 ### 3. Start the Application
@@ -351,29 +365,86 @@ RUN apt-get install -y libasound2  # Required dependency
 - ✅ Headless mode enabled (`headless=True` in routes)
 - ✅ Non-root user (`appuser`) can access browsers
 
-### Mock LLM Server (Testing Only)
-For fast testing during development without waiting for LLM inference:
+### LLM Options: Local & Cloud
 
+The system supports any OpenAI-compatible LLM endpoint. Configure via `LLM_SERVER_URL` environment variable.
+
+#### 🏠 Local LLM (Recommended for Development)
+
+**DeepSeek V2 (via llama.cpp)**
 ```bash
-# Start mock server (returns instant hardcoded responses)
-python3 mock_llm_server.py
+# Start local DeepSeek server
+./start_ai.sh
 
-# Access at http://localhost:8080
+# Runs on http://localhost:8080
+# ~0.6s generation time (18 tokens/sec on CPU)
+# ~3-5s with GPU acceleration
 ```
 
-**⚠️ IMPORTANT: This is for TESTING ONLY!**
-- Returns hardcoded Playwright commands (not real AI)
-- Only recognizes specific test phrases
-- Use real LLM (DeepSeek/GPT) for production
+**Other Local Options:**
+- **Ollama**: `ollama serve` + OpenAI-compatible endpoint
+- **LM Studio**: Desktop app with OpenAI API
+- **llama.cpp server**: Custom model hosting
 
-Mock server provides hardcoded commands for:
-- Navigation: "Open OpenEMIS" → `navigate` command
-- Login: "Login as admin" → 5 commands (navigate, fill username, fill password, click, wait)
+#### ☁️ Cloud LLM (Production)
+
+**DeepSeek API**
+```bash
+# DeepSeek Official API (China-based, fast, affordable)
+export LLM_SERVER_URL="https://api.deepseek.com/v1"
+export LLM_API_KEY="your-deepseek-api-key"
+
+# Model: deepseek-chat (recommended)
+# Pricing: ~$0.14/1M input tokens, ~$0.28/1M output tokens
+```
+
+**Tencent Hunyuan (腾讯混元)**
+```bash
+# Tencent Cloud AI API (China region, enterprise-grade)
+export LLM_SERVER_URL="https://hunyuan.tencentcloudapi.com/v1"
+export LLM_API_KEY="your-tencent-secret-id"
+export LLM_SECRET_KEY="your-tencent-secret-key"
+
+# Model: hunyuan-lite, hunyuan-standard, hunyuan-pro
+# Good for: Chinese language tasks, compliance requirements
+```
+
+**OpenAI GPT**
+```bash
+# OpenAI Official API (Global, most capable)
+export LLM_SERVER_URL="https://api.openai.com/v1"
+export LLM_API_KEY="your-openai-api-key"
+
+# Model: gpt-4-turbo, gpt-3.5-turbo
+# Pricing: ~$10-30/1M tokens depending on model
+```
+
+**Other Cloud Options:**
+- **Anthropic Claude**: `https://api.anthropic.com`
+- **Google Gemini**: `https://generativelanguage.googleapis.com`
+- **Microsoft Azure OpenAI**: `https://your-resource.openai.azure.com`
+- **Alibaba Cloud**: Qwen/Tongyi models
+
+#### 🔧 Configuration
+
+Edit `docker/.env`:
+```bash
+# Local DeepSeek (default)
+LLM_SERVER_URL=http://host.docker.internal:8080
+
+# Or Cloud API
+LLM_SERVER_URL=https://api.deepseek.com/v1
+LLM_API_KEY=your-api-key-here
+```
 
 **Performance Comparison:**
-- Real LLM: ~0.6s generation time (18 tokens/sec on CPU)
-- Mock LLM: <100ms response time
-- Browser execution: ~4-9s depending on complexity
+| Option | Speed | Cost | Best For |
+|--------|-------|------|----------|
+| Local CPU | ~0.6s | Free | Development, privacy |
+| Local GPU | ~0.2s | Free | Production (self-hosted) |
+| DeepSeek API | ~0.3s | $0.14/1M tokens | Cost-effective production |
+| Tencent Hunyuan | ~0.4s | ¥0.015/1K tokens | China region, compliance |
+| OpenAI GPT-4 | ~0.5s | $10-30/1M tokens | Maximum quality |
 
 ## 📊 API Documentation
 
