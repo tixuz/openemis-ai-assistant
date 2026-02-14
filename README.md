@@ -238,6 +238,43 @@ pytest tests/integration/ -v
 pytest --cov=backend tests/
 ```
 
+## 🐳 Docker + Browser Setup
+
+### Chromium in Docker
+The system runs Chromium in **headless mode** inside Docker containers:
+
+```dockerfile
+# Install to shared location accessible by non-root user
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN playwright install chromium
+RUN apt-get install -y libasound2  # Required dependency
+```
+
+**Key points:**
+- ✅ Browsers installed to `/opt/ms-playwright` (not `/root/.cache`)
+- ✅ Using `chromium` (not `chrome`) for `playwright.chromium.launch()`
+- ✅ Headless mode enabled (`headless=True` in routes)
+- ✅ Non-root user (`appuser`) can access browsers
+
+### Mock LLM Server
+For fast testing without waiting for LLM inference:
+
+```bash
+# Start mock server (returns instant responses)
+python3 mock_llm_server.py
+
+# Access at http://localhost:8080
+```
+
+Mock server provides hardcoded Playwright commands for:
+- Navigation: "Open OpenEMIS" → `navigate` command
+- Login: "Login as admin" → 5 commands (navigate, fill username, fill password, click, wait)
+
+**Performance:**
+- Real LLM: ~0.6s generation time (18 tokens/sec on CPU)
+- Mock LLM: <100ms response time
+- Browser execution: ~4-9s depending on complexity
+
 ## 📊 API Documentation
 
 ### Authentication
