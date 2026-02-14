@@ -139,17 +139,50 @@ class ChatInterface {
 
             // Add execution result if available
             if (options.executionResult) {
-                const resultDiv = document.createElement('div');
-                resultDiv.style.marginTop = '10px';
-                resultDiv.style.fontSize = '0.9em';
-                resultDiv.style.opacity = '0.8';
-
                 const result = options.executionResult;
-                if (result.screenshots && result.screenshots.length > 0) {
-                    resultDiv.innerHTML += `<br>📸 Screenshots: ${result.screenshots.length}`;
-                }
 
-                div.appendChild(resultDiv);
+                // Display screenshot images if available
+                if (result.screenshot_data && result.screenshot_data.length > 0) {
+                    const screenshotsDiv = document.createElement('div');
+                    screenshotsDiv.style.marginTop = '15px';
+                    screenshotsDiv.innerHTML = '<strong style="font-size: 14px;">📸 Screenshots:</strong>';
+
+                    result.screenshot_data.forEach((screenshot, index) => {
+                        const imgContainer = document.createElement('div');
+                        imgContainer.style.marginTop = '10px';
+                        imgContainer.style.border = '2px solid #ddd';
+                        imgContainer.style.borderRadius = '8px';
+                        imgContainer.style.overflow = 'hidden';
+                        imgContainer.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+
+                        const img = document.createElement('img');
+                        img.src = `data:image/png;base64,${screenshot.data}`;
+                        img.alt = screenshot.filename;
+                        img.style.width = '100%';
+                        img.style.display = 'block';
+                        img.style.cursor = 'pointer';
+                        img.title = 'Click to view full size';
+
+                        // Click to open in new tab
+                        img.onclick = () => {
+                            const newWindow = window.open();
+                            newWindow.document.write(`<img src="${img.src}" style="max-width:100%;">`);
+                        };
+
+                        const caption = document.createElement('div');
+                        caption.style.padding = '8px';
+                        caption.style.background = '#f5f5f5';
+                        caption.style.fontSize = '12px';
+                        caption.style.color = '#666';
+                        caption.textContent = screenshot.filename;
+
+                        imgContainer.appendChild(img);
+                        imgContainer.appendChild(caption);
+                        screenshotsDiv.appendChild(imgContainer);
+                    });
+
+                    div.appendChild(screenshotsDiv);
+                }
             }
         } else if (type === 'error') {
             div.textContent = content;

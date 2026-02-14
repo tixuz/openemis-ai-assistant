@@ -136,11 +136,9 @@ async def chat(
                     else:
                         response_text += f"{i}. {cmd.type}\n"
 
-                # Show screenshots if any
+                # Show screenshots count (actual images will be displayed by frontend)
                 if result.screenshots:
-                    response_text += f"\n**Screenshots:**\n"
-                    for s in result.screenshots:
-                        response_text += f"- {s}\n"
+                    response_text += f"\n**Screenshots:** {len(result.screenshots)} captured (displayed below)\n"
 
                 # Show extracted data if any
                 if result.extracted_data:

@@ -35,7 +35,8 @@ class ExecutionResult:
         self.success: bool = False
         self.commands_executed: int = 0
         self.execution_time_ms: int = 0
-        self.screenshots: List[str] = []
+        self.screenshots: List[str] = []  # File paths
+        self.screenshot_data: List[Dict[str, str]] = []  # Base64 data for display
         self.extracted_data: Dict[str, Any] = {}
         self.error: Optional[str] = None
         self.error_command_index: Optional[int] = None
@@ -46,6 +47,7 @@ class ExecutionResult:
             "commands_executed": self.commands_executed,
             "execution_time_ms": self.execution_time_ms,
             "screenshots": self.screenshots,
+            "screenshot_data": self.screenshot_data,
             "extracted_data": self.extracted_data,
             "error": self.error,
             "error_command_index": self.error_command_index
@@ -196,7 +198,9 @@ class AutomationEngine:
         await self.page.wait_for_load_state("networkidle", timeout=cmd.timeout)
 
     async def _handle_screenshot(self, cmd: ScreenshotCommand, result: ExecutionResult):
-        """Take a screenshot"""
+        """Take a screenshot and encode for display"""
+        import base64
+
         # Generate filename if not provided
         if cmd.filename:
             filename = cmd.filename
@@ -207,6 +211,18 @@ class AutomationEngine:
         filepath = os.path.join("logs/screenshots", filename)
         await self.page.screenshot(path=filepath, full_page=True)
         result.screenshots.append(filepath)
+
+        # Also encode as base64 for inline display
+        try:
+            with open(filepath, "rb") as f:
+                image_data = base64.b64encode(f.read()).decode('utf-8')
+                result.screenshot_data.append({
+                    "filename": filename,
+                    "data": image_data,
+                    "path": filepath
+                })
+        except Exception as e:
+            print(f"Warning: Could not encode screenshot for display: {e}")
 
     async def _handle_extract_text(
         self,
