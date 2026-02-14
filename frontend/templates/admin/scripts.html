@@ -280,6 +280,7 @@
         <h2 id="editor-title">New Script</h2>
         <div class="btn-group">
             <button class="btn btn-success" onclick="scriptManager.save()">💾 Save</button>
+            <button class="btn btn-secondary" onclick="scriptManager.copyScript()" id="copy-btn" style="display:none;">📋 Copy Script</button>
             <button class="btn btn-danger" onclick="scriptManager.deleteScript()" id="delete-btn" style="display:none;">🗑️ Delete</button>
             <button class="btn btn-secondary" onclick="scriptManager.cancel()">Cancel</button>
         </div>
@@ -333,6 +334,7 @@
                 <option value="url">URL</option>
                 <option value="selector">Selector</option>
                 <option value="number">Number</option>
+                <option value="script">Script</option>
             </select>
             <input type="text" class="param-description" placeholder="Description">
             <button type="button" class="btn btn-danger" onclick="this.closest('.parameter-item').remove()">×</button>
@@ -414,6 +416,7 @@ class ScriptManager {
             document.getElementById('script-tags').value = this.currentScript.tags.join(', ');
             document.getElementById('script-commands').value = JSON.stringify(this.currentScript.commands, null, 2);
             document.getElementById('delete-btn').style.display = 'inline-block';
+            document.getElementById('copy-btn').style.display = 'inline-block';
 
             // Render parameters
             this.currentScript.parameters.forEach(param => {
@@ -422,6 +425,32 @@ class ScriptManager {
         } else {
             document.getElementById('editor-title').textContent = 'New Script';
         }
+    }
+
+    copyScript() {
+        if (!this.currentScript) return;
+
+        // Save reference to current script
+        const originalScript = JSON.parse(JSON.stringify(this.currentScript));
+        const copiedName = `${originalScript.name}_copy`;
+
+        // Reset to create mode
+        this.currentScript = null;
+        this.renderEditor();
+
+        // Fill with copied data
+        document.getElementById('editor-title').textContent = `Copy of: ${originalScript.name}`;
+        document.getElementById('script-name').value = copiedName;
+        document.getElementById('script-description').value = originalScript.description + ' (Copy)';
+        document.getElementById('script-tags').value = originalScript.tags.join(', ');
+        document.getElementById('script-commands').value = JSON.stringify(originalScript.commands, null, 2);
+
+        // Copy parameters
+        originalScript.parameters.forEach(param => {
+            this.addParameter(param);
+        });
+
+        this.showMessage('📋 Script copied! Edit the name and click Save.', 'success');
     }
 
     addParameter(data = null) {

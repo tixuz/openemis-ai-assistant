@@ -13,7 +13,7 @@ import uuid
 class ScriptParameter(BaseModel):
     """Input parameter for a script"""
     name: str = Field(..., description="Parameter name (e.g., 'username', 'institution_code')")
-    type: str = Field("text", description="Parameter type: text, password, url, selector, number")
+    type: str = Field("text", description="Parameter type: text, password, url, selector, number, script")
     description: Optional[str] = Field(None, description="Help text for this parameter")
     default_value: Optional[str] = Field(None, description="Default value")
     required: bool = Field(True, description="Is this parameter required?")

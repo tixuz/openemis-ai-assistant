@@ -361,14 +361,14 @@ class ScriptRunner {
             document.getElementById('execution-form').style.display = 'block';
 
             // Render parameters
-            this.renderParameters(script.parameters);
+            await this.renderParameters(script.parameters);
 
         } catch (error) {
             this.showMessage('Failed to load script details: ' + error.message, 'error');
         }
     }
 
-    renderParameters(parameters) {
+    async renderParameters(parameters) {
         const container = document.getElementById('parameters-container');
 
         if (parameters.length === 0) {
@@ -376,20 +376,55 @@ class ScriptRunner {
             return;
         }
 
-        container.innerHTML = parameters.map(param => `
-            <div class="parameter-field">
-                <label>
-                    ${param.name} ${param.required ? '<span style="color: red;">*</span>' : ''}
-                </label>
-                <input
-                    type="${param.type === 'password' ? 'password' : 'text'}"
-                    id="param-${param.name}"
-                    ${param.required ? 'required' : ''}
-                    placeholder="${param.default_value || ''}"
-                >
-                ${param.description ? `<small>${param.description}</small>` : ''}
-            </div>
-        `).join('');
+        // Get all scripts for script-type parameters
+        let allScripts = [];
+        try {
+            const response = await apiClient.get('scripts');
+            allScripts = response.scripts;
+        } catch (error) {
+            console.error('Failed to load scripts for parameters:', error);
+        }
+
+        container.innerHTML = parameters.map(param => {
+            // If parameter type is "script", show dropdown
+            if (param.type === 'script') {
+                const scriptOptions = allScripts.map(s =>
+                    `<option value="${s.name}">${s.name} - ${s.description}</option>`
+                ).join('');
+
+                return `
+                    <div class="parameter-field">
+                        <label>
+                            ${param.name} ${param.required ? '<span style="color: red;">*</span>' : ''}
+                        </label>
+                        <select
+                            id="param-${param.name}"
+                            ${param.required ? 'required' : ''}
+                        >
+                            <option value="">-- Select a script --</option>
+                            ${scriptOptions}
+                        </select>
+                        ${param.description ? `<small>${param.description}</small>` : ''}
+                    </div>
+                `;
+            }
+
+            // Regular input for other types
+            return `
+                <div class="parameter-field">
+                    <label>
+                        ${param.name} ${param.required ? '<span style="color: red;">*</span>' : ''}
+                    </label>
+                    <input
+                        type="${param.type === 'password' ? 'password' : 'text'}"
+                        id="param-${param.name}"
+                        ${param.required ? 'required' : ''}
+                        placeholder="${param.default_value || ''}"
+                    >
+                    ${param.description ? `<small>${param.description}</small>` : ''}
+                </div>
+            `;
+        }).join('');
     }
 
     async executeScript(event) {
