@@ -296,6 +296,15 @@ When you send a message, the system intelligently chooses the best execution met
 │   ├── SCRIPT_LIBRARY.md   # Script system docs
 │   └── WORKFLOWS.md        # Workflow system docs
 
+├── development/         # Historical development scripts
+│   ├── README.md        # Development timeline & lessons learned
+│   ├── main.py          # Original FastAPI prototype
+│   ├── dp_agent.py      # Early agent (used exec())
+│   ├── chat.py          # Simple chat test
+│   ├── debug_chat.py    # Debugging version
+│   ├── ai_agent_test.py # First integration test
+│   └── mock_llm_server.py  # Mock server for testing
+
 ├── tests/               # Test suites
 │   ├── unit/
 │   └── integration/
@@ -330,6 +339,31 @@ Only these commands can be executed:
 
 ### Security Disclosure
 Found a security issue? Please email security@example.com or see [SECURITY.md](SECURITY.md)
+
+## 📖 Development Journey
+
+This project evolved from an insecure prototype to a production-ready system through multiple iterations. The **`development/`** folder contains historical scripts that document this journey.
+
+### Evolution Timeline
+
+| Phase | Files | Key Issues | What We Learned |
+|-------|-------|------------|-----------------|
+| **Phase 1: Prototype** | `ai_agent_test.py`, `chat.py` | No structure, direct exec() | ✅ Proved LLM can automate browsers |
+| **Phase 2: Integration** | `main.py`, `dp_agent.py` | Security holes, no auth, CORS open | ✅ Need proper architecture |
+| **Phase 3: Testing** | `mock_llm_server.py` | Slow LLM iteration | ✅ Mock dependencies for speed |
+| **Phase 4: Production** | `backend/`, `frontend/` | Complete rewrite with security | ✅ Current system (v2.0+) |
+
+### Key Lessons Learned
+
+1. **Never use exec() in production** → Implemented command whitelist
+2. **LLM should return data, not code** → Structured JSON output
+3. **Security from day one** → JWT, CORS, rate limiting, validation
+4. **Learn from successes** → Learning store with few-shot examples
+5. **Proper architecture matters** → Separated backend/frontend/extension
+
+**📁 Full development timeline**: See [`development/README.md`](development/README.md) for detailed history and lessons learned.
+
+**⚠️ Note**: Scripts in `development/` are for reference only and should NOT be used in production.
 
 ## 🧪 Testing
 
