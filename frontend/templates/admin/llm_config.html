@@ -357,10 +357,10 @@
                 </div>
                 <div class="form-section">
                     <label>API Endpoint</label>
-                    <input type="text" class="input-field"
-                           value="https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-                           readonly style="background: #f5f5f5; color: #666;">
-                    <p class="help-text">Google Generative Language API endpoint</p>
+                    <input type="text" id="geminiEndpoint" class="input-field"
+                           value="https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+                           readonly style="background: #f5f5f5; color: #666; font-size: 12px;">
+                    <p class="help-text">Google Generative Language API endpoint (updates with model selection)</p>
                 </div>
                 <div class="form-section">
                     <label for="geminiApiKey">API Key</label>
@@ -373,7 +373,7 @@
                 </div>
                 <div class="form-section">
                     <label for="geminiModel">Model</label>
-                    <select id="geminiModel" class="provider-select">
+                    <select id="geminiModel" class="provider-select" onchange="updateGeminiEndpoint()">
                         <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast & Efficient)</option>
                         <option value="gemini-1.5-pro">Gemini 1.5 Pro (Most Capable)</option>
                         <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
@@ -648,6 +648,12 @@ function buildConfigFromForm() {
 function togglePassword(fieldId) {
     const field = document.getElementById(fieldId);
     field.type = field.type === 'password' ? 'text' : 'password';
+}
+
+function updateGeminiEndpoint() {
+    const model = document.getElementById('geminiModel').value;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    document.getElementById('geminiEndpoint').value = endpoint;
 }
 
 function showAlert(message, type) {
