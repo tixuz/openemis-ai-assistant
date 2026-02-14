@@ -17,16 +17,16 @@ class HistoryStore:
     Manages chat history storage.
 
     Stores each user's history in a separate JSONL file:
-    data/history/{user_id}/chat_history.jsonl
+    data/history/{username}/chat_history.jsonl
     """
 
     def __init__(self, base_dir: str = "data/history"):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
-    def _get_user_history_file(self, user_id: str) -> Path:
+    def _get_user_history_file(self, username: str) -> Path:
         """Get the history file path for a specific user"""
-        user_dir = self.base_dir / user_id
+        user_dir = self.base_dir / username
         user_dir.mkdir(parents=True, exist_ok=True)
         return user_dir / "chat_history.jsonl"
 
@@ -40,7 +40,7 @@ class HistoryStore:
         Returns:
             Message ID
         """
-        file_path = self._get_user_history_file(message.user_id)
+        file_path = self._get_user_history_file(message.username)
 
         # Append to JSONL file
         with open(file_path, "a") as f:
@@ -50,7 +50,7 @@ class HistoryStore:
 
     async def get_user_history(
         self,
-        user_id: str,
+        username: str,
         limit: int = 50,
         offset: int = 0
     ) -> List[ChatMessage]:
@@ -58,14 +58,14 @@ class HistoryStore:
         Get chat history for a specific user.
 
         Args:
-            user_id: User's unique identifier
+            username: Username (unique identifier)
             limit: Maximum number of messages to return
             offset: Number of messages to skip (for pagination)
 
         Returns:
             List of ChatMessage objects, newest first
         """
-        file_path = self._get_user_history_file(user_id)
+        file_path = self._get_user_history_file(username)
 
         if not file_path.exists():
             return []
@@ -90,21 +90,21 @@ class HistoryStore:
 
     async def get_recent_messages(
         self,
-        user_id: str,
+        username: str,
         hours: int = 24
     ) -> List[ChatMessage]:
         """
         Get recent messages within the specified time window.
 
         Args:
-            user_id: User's unique identifier
+            username: Username (unique identifier)
             hours: Number of hours to look back
 
         Returns:
             List of recent ChatMessage objects
         """
         cutoff_time = datetime.utcnow() - timedelta(hours=hours)
-        all_messages = await self.get_user_history(user_id, limit=1000)
+        all_messages = await self.get_user_history(username, limit=1000)
 
         recent = []
         for msg in all_messages:
@@ -114,17 +114,17 @@ class HistoryStore:
 
         return recent
 
-    async def count_user_messages(self, user_id: str) -> int:
+    async def count_user_messages(self, username: str) -> int:
         """
         Count total messages for a user.
 
         Args:
-            user_id: User's unique identifier
+            username: Username (unique identifier)
 
         Returns:
             Total message count
         """
-        file_path = self._get_user_history_file(user_id)
+        file_path = self._get_user_history_file(username)
 
         if not file_path.exists():
             return 0
@@ -132,17 +132,17 @@ class HistoryStore:
         with open(file_path, "r") as f:
             return sum(1 for _ in f)
 
-    async def delete_user_history(self, user_id: str) -> bool:
+    async def delete_user_history(self, username: str) -> bool:
         """
         Delete all history for a user.
 
         Args:
-            user_id: User's unique identifier
+            username: Username (unique identifier)
 
         Returns:
             True if deleted, False if not found
         """
-        user_dir = self.base_dir / user_id
+        user_dir = self.base_dir / username
         if user_dir.exists():
             # Delete history file
             history_file = user_dir / "chat_history.jsonl"
@@ -160,20 +160,20 @@ class HistoryStore:
 
     async def get_message_by_id(
         self,
-        user_id: str,
+        username: str,
         message_id: str
     ) -> Optional[ChatMessage]:
         """
         Get a specific message by ID.
 
         Args:
-            user_id: User's unique identifier
+            username: Username (unique identifier)
             message_id: Message ID to find
 
         Returns:
             ChatMessage if found, None otherwise
         """
-        messages = await self.get_user_history(user_id, limit=1000)
+        messages = await self.get_user_history(username, limit=1000)
         for msg in messages:
             if msg.id == message_id:
                 return msg

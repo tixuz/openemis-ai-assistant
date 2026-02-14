@@ -101,7 +101,6 @@ async def chat(
             # Save to conversation history
             history_store = get_history_store()
             chat_message = ChatMessage(
-                user_id=user.user_id,
                 username=user.username,
                 message=chat_req.message,
                 response=response_text,
@@ -131,7 +130,6 @@ async def chat(
             # Save to conversation history
             history_store = get_history_store()
             chat_message = ChatMessage(
-                user_id=user.user_id,
                 username=user.username,
                 message=chat_req.message,
                 response=response_text,
@@ -177,13 +175,13 @@ async def get_chat_history(
 
     # Get user's history
     messages = await history_store.get_user_history(
-        user_id=user.user_id,
+        username=user.username,
         limit=limit,
         offset=offset
     )
 
     # Get total count
-    total = await history_store.count_user_messages(user.user_id)
+    total = await history_store.count_user_messages(user.username)
 
     # Convert to dict
     history_data = [msg.model_dump() for msg in messages]

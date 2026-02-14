@@ -13,8 +13,7 @@ class ChatMessage(BaseModel):
     """A single chat message with AI response and optional automation result"""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str = Field(description="User's unique identifier")
-    username: str = Field(description="User's display name")
+    username: str = Field(description="Username (unique identifier)")
 
     # User's message
     message: str = Field(description="User's input message")
@@ -46,7 +45,6 @@ class ChatMessage(BaseModel):
         json_schema_extra = {
             "example": {
                 "id": "550e8400-e29b-41d4-a716-446655440000",
-                "user_id": "user123",
                 "username": "teacher1",
                 "message": "Login to OpenEMIS as admin",
                 "response": "✅ Automation completed successfully!\n\nExecuted 5 commands in 9549ms.",
