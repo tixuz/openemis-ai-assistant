@@ -3,8 +3,11 @@ Chat History Store
 
 Stores and retrieves conversation history per user.
 Uses JSONL format for consistency with learning examples.
+
+Screenshots are saved separately to avoid bloating JSONL files.
 """
 import json
+import base64
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -30,9 +33,51 @@ class HistoryStore:
         user_dir.mkdir(parents=True, exist_ok=True)
         return user_dir / "chat_history.jsonl"
 
+    def _get_user_images_dir(self, username: str) -> Path:
+        """Get the images directory for a specific user"""
+        images_dir = self.base_dir / username / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        return images_dir
+
+    def _save_screenshot(
+        self,
+        username: str,
+        screenshot_data: str,
+        timestamp: str
+    ) -> str:
+        """
+        Save screenshot as PNG file and return filename.
+
+        Args:
+            username: Username (unique identifier)
+            screenshot_data: Base64-encoded PNG data
+            timestamp: ISO timestamp for filename
+
+        Returns:
+            Filename of saved screenshot
+        """
+        images_dir = self._get_user_images_dir(username)
+
+        # Create filename: {timestamp}_screenshot.png
+        # Convert ISO timestamp to safe filename format
+        safe_timestamp = timestamp.replace(":", "-").replace(".", "-")
+        filename = f"{safe_timestamp}_screenshot.png"
+        filepath = images_dir / filename
+
+        # Decode and save PNG
+        try:
+            image_bytes = base64.b64decode(screenshot_data)
+            with open(filepath, "wb") as f:
+                f.write(image_bytes)
+            return filename
+        except Exception as e:
+            print(f"Error saving screenshot: {e}")
+            return None
+
     async def save_message(self, message: ChatMessage) -> str:
         """
         Save a chat message to user's history.
+        Screenshots are extracted and saved as separate PNG files.
 
         Args:
             message: ChatMessage to save
@@ -40,9 +85,31 @@ class HistoryStore:
         Returns:
             Message ID
         """
+        # Extract and save screenshots separately
+        if message.execution_result and "screenshot_data" in message.execution_result:
+            screenshot_data_list = message.execution_result.get("screenshot_data", [])
+
+            if screenshot_data_list:
+                # Save each screenshot as PNG file
+                saved_filenames = []
+                for screenshot_info in screenshot_data_list:
+                    if "data" in screenshot_info:
+                        filename = self._save_screenshot(
+                            username=message.username,
+                            screenshot_data=screenshot_info["data"],
+                            timestamp=message.timestamp
+                        )
+                        if filename:
+                            saved_filenames.append(filename)
+
+                # Replace base64 data with just filenames
+                message.execution_result["screenshot_data"] = [
+                    {"filename": fname} for fname in saved_filenames
+                ]
+
         file_path = self._get_user_history_file(message.username)
 
-        # Append to JSONL file
+        # Append to JSONL file (without base64 screenshot data)
         with open(file_path, "a") as f:
             f.write(json.dumps(message.model_dump()) + "\n")
 
@@ -134,7 +201,7 @@ class HistoryStore:
 
     async def delete_user_history(self, username: str) -> bool:
         """
-        Delete all history for a user.
+        Delete all history for a user, including screenshots.
 
         Args:
             username: Username (unique identifier)
@@ -142,12 +209,19 @@ class HistoryStore:
         Returns:
             True if deleted, False if not found
         """
+        import shutil
+
         user_dir = self.base_dir / username
         if user_dir.exists():
             # Delete history file
             history_file = user_dir / "chat_history.jsonl"
             if history_file.exists():
                 history_file.unlink()
+
+            # Delete images directory and all screenshots
+            images_dir = user_dir / "images"
+            if images_dir.exists():
+                shutil.rmtree(images_dir)
 
             # Remove directory if empty
             try:
@@ -178,6 +252,35 @@ class HistoryStore:
             if msg.id == message_id:
                 return msg
         return None
+
+    async def load_screenshot(
+        self,
+        username: str,
+        filename: str
+    ) -> Optional[str]:
+        """
+        Load a screenshot and return as base64 string.
+
+        Args:
+            username: Username (unique identifier)
+            filename: Screenshot filename
+
+        Returns:
+            Base64-encoded PNG data, or None if not found
+        """
+        images_dir = self._get_user_images_dir(username)
+        filepath = images_dir / filename
+
+        if not filepath.exists():
+            return None
+
+        try:
+            with open(filepath, "rb") as f:
+                image_bytes = f.read()
+                return base64.b64encode(image_bytes).decode('utf-8')
+        except Exception as e:
+            print(f"Error loading screenshot {filename}: {e}")
+            return None
 
     async def get_all_users_with_history(self) -> List[str]:
         """

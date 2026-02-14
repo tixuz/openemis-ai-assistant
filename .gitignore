@@ -11,6 +11,10 @@ docker/.env
 # Data
 data/learning/examples.jsonl
 data/users.json
+data/history/  # Chat history and screenshots (sensitive user data)
+data/scripts/  # User-created scripts
+data/workflows/  # User-created workflows
+data/variables/  # User credentials and variables
 
 # Test artifacts
 .pytest_cache/

@@ -352,7 +352,8 @@ async def chat(
 async def get_chat_history(
     user: User = Depends(require_authenticated),
     limit: int = 50,
-    offset: int = 0
+    offset: int = 0,
+    load_screenshots: bool = False
 ):
     """
     Get user's chat/automation history.
@@ -366,6 +367,9 @@ async def get_chat_history(
     Args:
         limit: Max number of history items to return (default: 50)
         offset: Number of items to skip for pagination (default: 0)
+        load_screenshots: Whether to load screenshot base64 data (default: False)
+                         Screenshots are stored separately to avoid bloating history.
+                         Set to True to load full base64 data for display.
 
     Returns:
         Dictionary with history list and total count
@@ -384,6 +388,22 @@ async def get_chat_history(
 
     # Convert to dict
     history_data = [msg.model_dump() for msg in messages]
+
+    # Optionally load screenshots
+    if load_screenshots:
+        for item in history_data:
+            if item.get("execution_result") and item["execution_result"].get("screenshot_data"):
+                screenshot_list = item["execution_result"]["screenshot_data"]
+                for screenshot_info in screenshot_list:
+                    if "filename" in screenshot_info and "data" not in screenshot_info:
+                        # Load screenshot from file
+                        filename = screenshot_info["filename"]
+                        base64_data = await history_store.load_screenshot(
+                            username=user.username,
+                            filename=filename
+                        )
+                        if base64_data:
+                            screenshot_info["data"] = base64_data
 
     return {
         "history": history_data,
