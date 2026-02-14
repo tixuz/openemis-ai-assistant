@@ -10,6 +10,7 @@ from datetime import datetime
 from backend.models.api_schemas import (
     PromptUpdate, PromptResponse, ExampleListResponse, AnalyticsResponse
 )
+from backend.models.llm_config import LLMProviderConfig, get_llm_config_store
 from backend.models.auth import User
 from backend.models.learning import LearningExample
 from backend.api.dependencies import require_admin, require_prompt_engineer
@@ -275,3 +276,152 @@ async def test_automation(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Test failed: {e}")
+
+# LLM Configuration Management
+
+@router.get("/llm-config")
+async def get_llm_config(
+    user: User = Depends(require_admin)
+):
+    """
+    Get current LLM provider configuration.
+
+    Requires: admin role
+    
+    Returns current provider type and settings (API keys are masked).
+    """
+    config_store = get_llm_config_store()
+    config = config_store.load_config()
+    
+    # Mask API key for security
+    config_dict = config.model_dump()
+    if config_dict.get("api_key"):
+        config_dict["api_key"] = "***" + config_dict["api_key"][-4:] if len(config_dict["api_key"]) > 4 else "***"
+    
+    return config_dict
+
+
+@router.post("/llm-config")
+async def update_llm_config(
+    config: LLMProviderConfig,
+    user: User = Depends(require_admin)
+):
+    """
+    Update LLM provider configuration.
+
+    Requires: admin role
+    
+    Saves new provider settings including API keys (encrypted).
+    """
+    config_store = get_llm_config_store()
+    config_store.save_config(config)
+    
+    return {
+        "success": True,
+        "message": f"LLM provider updated to: {config.provider}",
+        "provider": config.provider
+    }
+
+
+@router.post("/llm-config/test")
+async def test_llm_config(
+    config: LLMProviderConfig,
+    user: User = Depends(require_admin)
+):
+    """
+    Test LLM provider connection.
+
+    Requires: admin role
+    
+    Tests connectivity without saving configuration.
+    """
+    from backend.core.llm_providers import LLMProviderFactory
+    
+    try:
+        # Create provider from config
+        provider = LLMProviderFactory.create_provider(
+            provider_type=config.provider,
+            config=config.get_provider_dict()
+        )
+        
+        # Test connection
+        is_connected = provider.test_connection()
+        
+        if is_connected:
+            return {
+                "success": True,
+                "message": f"Successfully connected to {config.provider}",
+                "provider": config.provider
+            }
+        else:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Failed to connect to {config.provider}"
+            )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Connection test failed: {str(e)}"
+        )
+
+
+@router.get("/llm-config/providers")
+async def list_llm_providers(
+    user: User = Depends(require_admin)
+):
+    """
+    List available LLM providers with their default models.
+
+    Requires: admin role
+    """
+    return {
+        "providers": [
+            {
+                "id": "local",
+                "name": "Local LLM",
+                "description": "Self-hosted LLM server (llama.cpp)",
+                "requires_api_key": False,
+                "default_model": None,
+                "models": ["Custom model on your server"]
+            },
+            {
+                "id": "claude",
+                "name": "Claude (Anthropic)",
+                "description": "Anthropic's Claude AI models",
+                "requires_api_key": True,
+                "default_model": "claude-3-5-sonnet-20241022",
+                "models": [
+                    "claude-3-5-sonnet-20241022",
+                    "claude-3-5-haiku-20241022",
+                    "claude-opus-4",
+                    "claude-3-opus-20240229"
+                ]
+            },
+            {
+                "id": "gemini",
+                "name": "Gemini (Google)",
+                "description": "Google's Gemini AI models",
+                "requires_api_key": True,
+                "default_model": "gemini-1.5-flash",
+                "models": [
+                    "gemini-1.5-flash",
+                    "gemini-1.5-pro",
+                    "gemini-2.0-flash-exp"
+                ]
+            },
+            {
+                "id": "openai",
+                "name": "ChatGPT (OpenAI)",
+                "description": "OpenAI's GPT models",
+                "requires_api_key": True,
+                "default_model": "gpt-4o-mini",
+                "models": [
+                    "gpt-4o",
+                    "gpt-4o-mini",
+                    "gpt-4-turbo",
+                    "gpt-3.5-turbo"
+                ]
+            }
+        ]
+    }

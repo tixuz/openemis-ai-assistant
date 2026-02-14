@@ -1,7 +1,8 @@
 """
-LLM Client - Request Structured Output from DeepSeek
+LLM Client - Request Structured Output from Multiple LLM Providers
 
 This client ensures the LLM returns JSON commands, not executable Python code.
+Supports Local LLM, Claude, Gemini, and OpenAI.
 Includes retry logic, timeout handling, and error recovery.
 """
 import asyncio
@@ -12,6 +13,12 @@ from requests.exceptions import RequestException, Timeout
 
 from backend.core.command_parser import CommandParser, ParseError
 from backend.models.commands import Command
+from backend.core.llm_providers import (
+    BaseLLMProvider,
+    LLMProviderFactory,
+    LLMProviderError
+)
+from backend.models.llm_config import get_llm_config_store
 
 
 class LLMError(Exception):
@@ -21,21 +28,39 @@ class LLMError(Exception):
 
 class LLMClient:
     """
-    Client for communicating with DeepSeek LLM server.
+    Client for communicating with LLM providers.
 
     Requests structured JSON output instead of executable code.
+    Automatically uses configured provider (Local/Claude/Gemini/OpenAI).
     """
 
     def __init__(
         self,
-        server_url: str = "http://localhost:8080/v1/chat/completions",
-        timeout: int = 180,  # 3 minutes for CPU inference
-        max_retries: int = 3
+        server_url: Optional[str] = None,  # For backward compatibility
+        timeout: int = 180,
+        max_retries: int = 3,
+        provider: Optional[BaseLLMProvider] = None  # Override provider
     ):
-        self.server_url = server_url
-        self.timeout = timeout
         self.max_retries = max_retries
         self.parser = CommandParser()
+
+        # Use provided provider or load from config
+        if provider:
+            self.provider = provider
+        else:
+            # Load from configuration
+            config_store = get_llm_config_store()
+            llm_config = config_store.load_config()
+
+            # Override server_url for local provider if provided
+            if server_url and llm_config.provider == "local":
+                llm_config.server_url = server_url
+
+            # Create provider from config
+            self.provider = LLMProviderFactory.create_provider(
+                provider_type=llm_config.provider,
+                config=llm_config.get_provider_dict()
+            )
 
     async def generate_commands(
         self,
@@ -154,17 +179,15 @@ Example format:
 
         for attempt in range(self.max_retries):
             try:
-                # Run synchronous request in thread pool
-                loop = asyncio.get_event_loop()
-                response_text = await loop.run_in_executor(
-                    None,
-                    self._make_request,
-                    messages,
-                    temperature
+                # Use provider to generate response
+                response_text = await self.provider.generate_json(
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=2000
                 )
                 return response_text
 
-            except (RequestException, Timeout) as e:
+            except (LLMProviderError, RequestException, Timeout) as e:
                 last_error = e
                 if attempt < self.max_retries - 1:
                     # Exponential backoff
@@ -174,65 +197,14 @@ Example format:
 
         raise LLMError(f"LLM request failed after {self.max_retries} attempts: {last_error}")
 
-    def _make_request(
-        self,
-        messages: List[Dict[str, str]],
-        temperature: float
-    ) -> str:
-        """
-        Make synchronous HTTP request to LLM server.
-
-        This runs in a thread pool via asyncio.run_in_executor
-        """
-        payload = {
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": 2000,
-            # Request JSON format (forces model to output valid JSON)
-            "response_format": {"type": "json_object"}
-        }
-
-        try:
-            response = requests.post(
-                self.server_url,
-                json=payload,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-
-            data = response.json()
-
-            # Extract content from response
-            if "choices" in data and len(data["choices"]) > 0:
-                content = data["choices"][0]["message"]["content"]
-                return content
-            else:
-                raise LLMError(f"Unexpected LLM response format: {data}")
-
-        except RequestException as e:
-            raise LLMError(f"HTTP request failed: {e}")
-        except (KeyError, IndexError) as e:
-            raise LLMError(f"Failed to extract content from response: {e}")
-
     def test_connection(self) -> bool:
         """
-        Test if LLM server is reachable.
+        Test if LLM provider is reachable.
 
         Returns:
-            True if server responds, False otherwise
+            True if provider responds, False otherwise
         """
-        try:
-            response = requests.post(
-                self.server_url,
-                json={
-                    "messages": [{"role": "user", "content": "Hello"}],
-                    "max_tokens": 10
-                },
-                timeout=5
-            )
-            return response.status_code == 200
-        except:
-            return False
+        return self.provider.test_connection()
 
 
 # Module-level convenience function
