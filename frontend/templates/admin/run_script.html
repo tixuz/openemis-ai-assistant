@@ -631,18 +631,16 @@ class ScriptRunner {
                 }
             });
 
-            // Create new script with values substituted
-            let commandsJson = JSON.stringify(this.selectedScript.commands);
-
-            // Substitute all parameter values in commands
-            for (const [key, value] of Object.entries(parameterValues)) {
-                commandsJson = commandsJson.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
-            }
+            // Expand nested scripts recursively
+            const expandedCommands = await this.expandScriptCommands(
+                this.selectedScript.commands,
+                parameterValues
+            );
 
             const newScript = {
                 name: presetName,
                 description: `${this.selectedScript.description} (preset with values)`,
-                commands: JSON.parse(commandsJson),
+                commands: expandedCommands,
                 parameters: [], // No parameters needed - values are hardcoded
                 tags: [...this.selectedScript.tags, 'preset'],
                 created_by: 'admin'
@@ -659,6 +657,60 @@ class ScriptRunner {
         } catch (error) {
             this.showMessage(`❌ Failed to save preset: ${error.message}`, 'error');
         }
+    }
+
+    async expandScriptCommands(commands, parameterValues) {
+        const expanded = [];
+
+        for (const cmd of commands) {
+            // Check if this is a script reference
+            if (cmd.type === 'script') {
+                const scriptParamName = cmd.value.replace(/[{}]/g, '');
+
+                // Get the actual script name from parameter values
+                const nestedScriptName = parameterValues[scriptParamName];
+
+                if (!nestedScriptName) {
+                    throw new Error(`Missing value for script parameter: ${scriptParamName}`);
+                }
+
+                // Fetch the nested script
+                const nestedScript = await apiClient.get(`scripts/${nestedScriptName}`);
+
+                // Collect nested parameter values (parent.child format)
+                const nestedParamValues = {};
+                for (const [key, value] of Object.entries(parameterValues)) {
+                    if (key.startsWith(`${scriptParamName}.`)) {
+                        const nestedKey = key.substring(scriptParamName.length + 1);
+                        nestedParamValues[nestedKey] = value;
+                    }
+                }
+
+                // Recursively expand nested script commands
+                const nestedExpanded = await this.expandScriptCommands(
+                    nestedScript.commands,
+                    nestedParamValues
+                );
+
+                // Add all expanded commands
+                expanded.push(...nestedExpanded);
+
+            } else {
+                // Regular command - substitute parameters
+                let cmdJson = JSON.stringify(cmd);
+
+                for (const [key, value] of Object.entries(parameterValues)) {
+                    // Only substitute keys without dots (not nested parameters)
+                    if (!key.includes('.')) {
+                        cmdJson = cmdJson.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+                    }
+                }
+
+                expanded.push(JSON.parse(cmdJson));
+            }
+        }
+
+        return expanded;
     }
 
     showMessage(text, type) {

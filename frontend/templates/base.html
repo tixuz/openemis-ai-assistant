@@ -42,6 +42,9 @@
             <a href="{{ url_for('admin_run_script') }}" class="nav-link {% if request.endpoint == 'admin_run_script' %}active{% endif %}">
                 ▶️ Run Script
             </a>
+            <a href="{{ url_for('admin_script_history') }}" class="nav-link {% if request.endpoint == 'admin_script_history' %}active{% endif %}">
+                📜 History
+            </a>
 
             <!-- User Chat (available to all logged-in users) -->
             <a href="{{ url_for('user_chat') }}" class="nav-link {% if request.endpoint == 'user_chat' %}active{% endif %}">

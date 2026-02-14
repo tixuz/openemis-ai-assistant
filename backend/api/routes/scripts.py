@@ -16,10 +16,12 @@ from backend.models.scripts import (
 )
 from backend.models.commands import Command
 from backend.models.auth import User
+from backend.models.history import ChatMessage
 from backend.api.dependencies import require_admin, require_authenticated
 from backend.core.script_store import get_script_store
 from backend.core.automation_engine import execute_automation
 from backend.core.variables_store import get_variables_store
+from backend.core.history_store import get_history_store
 
 
 router = APIRouter(prefix="/scripts", tags=["Scripts"])
@@ -195,12 +197,57 @@ async def execute_script(
             detail=f"Missing required parameters: {', '.join(missing)}"
         )
 
-    # Substitute parameters in commands
-    commands_json = json.dumps(script.commands)
+    # Expand nested scripts first
+    expanded_commands = []
+    for cmd in script.commands:
+        # Check if this is a script reference (script-type parameter)
+        if isinstance(cmd, dict) and cmd.get("type") == "script":
+            # This is a script parameter placeholder - need to expand it
+            script_param_name = cmd.get("value", "").strip("{}")
 
-    # First substitute script parameters
+            if script_param_name in request.parameters:
+                nested_script_name = request.parameters[script_param_name]
+
+                # Fetch the nested script
+                nested_script = await script_store.get_script(nested_script_name)
+                if not nested_script:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Nested script '{nested_script_name}' not found for parameter '{script_param_name}'"
+                    )
+
+                # Collect nested parameters (parent.child naming)
+                nested_params = {}
+                for req_param_name, req_param_value in request.parameters.items():
+                    if req_param_name.startswith(f"{script_param_name}."):
+                        # Extract the nested parameter name (after the dot)
+                        nested_key = req_param_name.split(".", 1)[1]
+                        nested_params[nested_key] = req_param_value
+
+                # Substitute nested parameters in nested script commands
+                nested_commands_json = json.dumps(nested_script.commands)
+                for nested_key, nested_value in nested_params.items():
+                    nested_commands_json = nested_commands_json.replace(f"{{{nested_key}}}", nested_value)
+
+                # Add expanded commands
+                expanded_commands.extend(json.loads(nested_commands_json))
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing script parameter: {script_param_name}"
+                )
+        else:
+            # Regular command, keep as-is
+            expanded_commands.append(cmd)
+
+    # Now substitute regular parameters in expanded commands
+    commands_json = json.dumps(expanded_commands)
+
+    # First substitute script parameters (non-script-type ones)
     for param_name, param_value in request.parameters.items():
-        commands_json = commands_json.replace(f"{{{param_name}}}", param_value)
+        # Skip nested parameters (they were already handled)
+        if "." not in param_name:
+            commands_json = commands_json.replace(f"{{{param_name}}}", param_value)
 
     # Then substitute user variables
     user_variables = await variables_store.get_variables_dict(user.username)
@@ -233,6 +280,18 @@ async def execute_script(
 
         if result.screenshots:
             response_text += f"📸 **Screenshot captured**\n"
+
+        # Save to scripts history branch
+        history_store = get_history_store()
+        chat_message = ChatMessage(
+            username=user.username,
+            message=f"Executed script: {request.script_name}",
+            response=response_text,
+            commands_generated=len(commands),
+            executed=True,
+            execution_result=result.to_dict()
+        )
+        await history_store.save_message(chat_message, branch="scripts")
 
         return {
             "success": True,

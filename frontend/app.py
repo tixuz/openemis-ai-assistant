@@ -173,6 +173,13 @@ def admin_run_script():
     return render_template('admin/run_script.html', username=session.get('username'))
 
 
+@app.route('/admin/script-history')
+@login_required
+def admin_script_history():
+    """Script execution history (available to all users)"""
+    return render_template('admin/script_history.html', username=session.get('username'))
+
+
 # API Proxy routes (to avoid CORS issues from frontend)
 @app.route('/api/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @login_required

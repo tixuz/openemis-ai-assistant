@@ -520,14 +520,27 @@ Full API docs: http://localhost:8000/docs
 To avoid bloating JSONL history files with large base64-encoded images, screenshots are stored separately:
 
 #### Storage Structure
+
+History is organized into two branches for better organization:
+
 ```
 data/history/{username}/
-├── chat_history.jsonl          # Lightweight message history
-└── images/                      # Screenshot PNG files
-    ├── 2026-02-14T10-30-45_screenshot.png
-    ├── 2026-02-14T10-31-12_screenshot.png
-    └── ...
+├── chat/                        # User chat interface history
+│   ├── history.jsonl            # Chat messages and responses
+│   └── images/                  # Screenshots from chat automations
+│       ├── 2026-02-14T10-30-45_screenshot.png
+│       └── ...
+└── scripts/                     # Script execution history
+    ├── history.jsonl            # Script execution logs
+    └── images/                  # Screenshots from script runs
+        ├── 2026-02-14T10-35-20_screenshot.png
+        └── ...
 ```
+
+**Why branched history?**
+- **Separation of concerns**: Chat conversations vs. script executions are tracked separately
+- **Better organization**: Easy to find chat history vs. automation logs
+- **Independent cleanup**: Can clear script logs without affecting chat history
 
 #### How It Works
 

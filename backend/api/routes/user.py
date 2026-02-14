@@ -141,7 +141,7 @@ async def chat(
                     "screenshot_data": workflow_execution.screenshot_data
                 }
             )
-            await history_store.save_message(chat_message)
+            await history_store.save_message(chat_message, branch="chat")
 
             return ChatResponse(
                 response=workflow_execution.message,
@@ -297,7 +297,7 @@ async def chat(
                 executed=True,
                 execution_result=result.to_dict()
             )
-            await history_store.save_message(chat_message)
+            await history_store.save_message(chat_message, branch="chat")
 
             return ChatResponse(
                 response=response_text,
@@ -334,7 +334,7 @@ async def chat(
                 response=response_text,
                 executed=False
             )
-            await history_store.save_message(chat_message)
+            await history_store.save_message(chat_message, branch="chat")
 
             return ChatResponse(
                 response=response_text,
@@ -376,11 +376,12 @@ async def get_chat_history(
     """
     history_store = get_history_store()
 
-    # Get user's history
+    # Get user's chat history
     messages = await history_store.get_user_history(
         username=user.username,
         limit=limit,
-        offset=offset
+        offset=offset,
+        branch="chat"
     )
 
     # Get total count
@@ -389,7 +390,7 @@ async def get_chat_history(
     # Convert to dict
     history_data = [msg.model_dump() for msg in messages]
 
-    # Optionally load screenshots
+    # Optionally load screenshots from chat branch
     if load_screenshots:
         for item in history_data:
             if item.get("execution_result") and item["execution_result"].get("screenshot_data"):
@@ -400,7 +401,8 @@ async def get_chat_history(
                         filename = screenshot_info["filename"]
                         base64_data = await history_store.load_screenshot(
                             username=user.username,
-                            filename=filename
+                            filename=filename,
+                            branch="chat"
                         )
                         if base64_data:
                             screenshot_info["data"] = base64_data

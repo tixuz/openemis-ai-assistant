@@ -17,25 +17,48 @@ from backend.models.history import ChatMessage
 
 class HistoryStore:
     """
-    Manages chat history storage.
+    Manages history storage with separate branches for chat and scripts.
 
-    Stores each user's history in a separate JSONL file:
-    data/history/{username}/chat_history.jsonl
+    Stores each user's history in separate JSONL files by branch:
+    - data/history/{username}/chat/history.jsonl
+    - data/history/{username}/scripts/history.jsonl
+
+    Screenshots are stored in branch-specific directories:
+    - data/history/{username}/chat/images/
+    - data/history/{username}/scripts/images/
     """
 
     def __init__(self, base_dir: str = "data/history"):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
-    def _get_user_history_file(self, username: str) -> Path:
-        """Get the history file path for a specific user"""
-        user_dir = self.base_dir / username
-        user_dir.mkdir(parents=True, exist_ok=True)
-        return user_dir / "chat_history.jsonl"
+    def _get_user_history_file(self, username: str, branch: str = "chat") -> Path:
+        """
+        Get the history file path for a specific user and branch.
 
-    def _get_user_images_dir(self, username: str) -> Path:
-        """Get the images directory for a specific user"""
-        images_dir = self.base_dir / username / "images"
+        Args:
+            username: Username (unique identifier)
+            branch: History branch - "chat" or "scripts" (default: "chat")
+
+        Returns:
+            Path to history JSONL file
+        """
+        branch_dir = self.base_dir / username / branch
+        branch_dir.mkdir(parents=True, exist_ok=True)
+        return branch_dir / "history.jsonl"
+
+    def _get_user_images_dir(self, username: str, branch: str = "chat") -> Path:
+        """
+        Get the images directory for a specific user and branch.
+
+        Args:
+            username: Username (unique identifier)
+            branch: History branch - "chat" or "scripts" (default: "chat")
+
+        Returns:
+            Path to images directory
+        """
+        images_dir = self.base_dir / username / branch / "images"
         images_dir.mkdir(parents=True, exist_ok=True)
         return images_dir
 
@@ -43,7 +66,8 @@ class HistoryStore:
         self,
         username: str,
         screenshot_data: str,
-        timestamp: str
+        timestamp: str,
+        branch: str = "chat"
     ) -> str:
         """
         Save screenshot as PNG file and return filename.
@@ -52,11 +76,12 @@ class HistoryStore:
             username: Username (unique identifier)
             screenshot_data: Base64-encoded PNG data
             timestamp: ISO timestamp for filename
+            branch: History branch - "chat" or "scripts" (default: "chat")
 
         Returns:
             Filename of saved screenshot
         """
-        images_dir = self._get_user_images_dir(username)
+        images_dir = self._get_user_images_dir(username, branch)
 
         # Create filename: {timestamp}_screenshot.png
         # Convert ISO timestamp to safe filename format
@@ -74,13 +99,18 @@ class HistoryStore:
             print(f"Error saving screenshot: {e}")
             return None
 
-    async def save_message(self, message: ChatMessage) -> str:
+    async def save_message(
+        self,
+        message: ChatMessage,
+        branch: str = "chat"
+    ) -> str:
         """
-        Save a chat message to user's history.
+        Save a message to user's history in the specified branch.
         Screenshots are extracted and saved as separate PNG files.
 
         Args:
             message: ChatMessage to save
+            branch: History branch - "chat" or "scripts" (default: "chat")
 
         Returns:
             Message ID
@@ -90,14 +120,15 @@ class HistoryStore:
             screenshot_data_list = message.execution_result.get("screenshot_data", [])
 
             if screenshot_data_list:
-                # Save each screenshot as PNG file
+                # Save each screenshot as PNG file in branch-specific directory
                 saved_filenames = []
                 for screenshot_info in screenshot_data_list:
                     if "data" in screenshot_info:
                         filename = self._save_screenshot(
                             username=message.username,
                             screenshot_data=screenshot_info["data"],
-                            timestamp=message.timestamp
+                            timestamp=message.timestamp,
+                            branch=branch
                         )
                         if filename:
                             saved_filenames.append(filename)
@@ -107,7 +138,7 @@ class HistoryStore:
                     {"filename": fname} for fname in saved_filenames
                 ]
 
-        file_path = self._get_user_history_file(message.username)
+        file_path = self._get_user_history_file(message.username, branch)
 
         # Append to JSONL file (without base64 screenshot data)
         with open(file_path, "a") as f:
@@ -119,20 +150,22 @@ class HistoryStore:
         self,
         username: str,
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
+        branch: str = "chat"
     ) -> List[ChatMessage]:
         """
-        Get chat history for a specific user.
+        Get history for a specific user from a specific branch.
 
         Args:
             username: Username (unique identifier)
             limit: Maximum number of messages to return
             offset: Number of messages to skip (for pagination)
+            branch: History branch - "chat" or "scripts" (default: "chat")
 
         Returns:
             List of ChatMessage objects, newest first
         """
-        file_path = self._get_user_history_file(username)
+        file_path = self._get_user_history_file(username, branch)
 
         if not file_path.exists():
             return []
@@ -158,20 +191,22 @@ class HistoryStore:
     async def get_recent_messages(
         self,
         username: str,
-        hours: int = 24
+        hours: int = 24,
+        branch: str = "chat"
     ) -> List[ChatMessage]:
         """
-        Get recent messages within the specified time window.
+        Get recent messages within the specified time window from a specific branch.
 
         Args:
             username: Username (unique identifier)
             hours: Number of hours to look back
+            branch: History branch - "chat" or "scripts" (default: "chat")
 
         Returns:
             List of recent ChatMessage objects
         """
         cutoff_time = datetime.utcnow() - timedelta(hours=hours)
-        all_messages = await self.get_user_history(username, limit=1000)
+        all_messages = await self.get_user_history(username, limit=1000, branch=branch)
 
         recent = []
         for msg in all_messages:
@@ -199,12 +234,13 @@ class HistoryStore:
         with open(file_path, "r") as f:
             return sum(1 for _ in f)
 
-    async def delete_user_history(self, username: str) -> bool:
+    async def delete_user_history(self, username: str, branch: Optional[str] = None) -> bool:
         """
-        Delete all history for a user, including screenshots.
+        Delete history for a user. Can delete specific branch or all branches.
 
         Args:
             username: Username (unique identifier)
+            branch: Specific branch to delete ("chat" or "scripts"), or None to delete all
 
         Returns:
             True if deleted, False if not found
@@ -212,25 +248,22 @@ class HistoryStore:
         import shutil
 
         user_dir = self.base_dir / username
-        if user_dir.exists():
-            # Delete history file
-            history_file = user_dir / "chat_history.jsonl"
-            if history_file.exists():
-                history_file.unlink()
+        if not user_dir.exists():
+            return False
 
-            # Delete images directory and all screenshots
-            images_dir = user_dir / "images"
-            if images_dir.exists():
-                shutil.rmtree(images_dir)
-
-            # Remove directory if empty
-            try:
-                user_dir.rmdir()
-            except OSError:
-                pass  # Directory not empty, that's fine
-
-            return True
-        return False
+        if branch:
+            # Delete specific branch
+            branch_dir = user_dir / branch
+            if branch_dir.exists():
+                shutil.rmtree(branch_dir)
+                return True
+            return False
+        else:
+            # Delete all branches for this user
+            if user_dir.exists():
+                shutil.rmtree(user_dir)
+                return True
+            return False
 
     async def get_message_by_id(
         self,
@@ -256,19 +289,21 @@ class HistoryStore:
     async def load_screenshot(
         self,
         username: str,
-        filename: str
+        filename: str,
+        branch: str = "chat"
     ) -> Optional[str]:
         """
-        Load a screenshot and return as base64 string.
+        Load a screenshot from a specific branch and return as base64 string.
 
         Args:
             username: Username (unique identifier)
             filename: Screenshot filename
+            branch: History branch - "chat" or "scripts" (default: "chat")
 
         Returns:
             Base64-encoded PNG data, or None if not found
         """
-        images_dir = self._get_user_images_dir(username)
+        images_dir = self._get_user_images_dir(username, branch)
         filepath = images_dir / filename
 
         if not filepath.exists():

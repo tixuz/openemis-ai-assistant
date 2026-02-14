@@ -1,8 +1,7 @@
 """
-Workflow Engine - Intent Recognition and Execution
+Workflow Engine - Enhanced with Code Analyzer Integration
 
-Converts natural language like "mark attendance, john is absent"
-into structured workflows that execute script chains.
+Converts natural language to workflows with REAL selectors from OpenEMIS source code.
 """
 import json
 import re
@@ -23,32 +22,65 @@ from backend.core.automation_engine import execute_automation
 from backend.models.commands import Command
 from pydantic import TypeAdapter
 
+# Import CodeAnalyzer
+try:
+    from backend.core.code_analyzer import get_code_analyzer
+    CODE_ANALYZER_AVAILABLE = True
+except ImportError:
+    CODE_ANALYZER_AVAILABLE = False
+    print("⚠️  CodeAnalyzer not available - selectors won't be enriched")
+
 
 class IntentDetector:
     """Detects user intent from natural language"""
 
     def __init__(self):
         self.patterns = INTENT_PATTERNS
+        
+        # Load smart templates if available
+        self.smart_templates = self._load_smart_templates()
+
+    def _load_smart_templates(self) -> Dict:
+        """Load smart templates with pre-defined intents."""
+        template_file = Path("data/smart_templates.json")
+        if template_file.exists():
+            try:
+                with open(template_file) as f:
+                    data = json.load(f)
+                    return data.get("templates", {})
+            except Exception as e:
+                print(f"⚠️  Could not load smart templates: {e}")
+        return {}
 
     async def detect_intent(self, message: str) -> Optional[WorkflowIntent]:
         """
         Detect intent from user message.
-
-        Args:
-            message: User's natural language message
-
-        Returns:
-            WorkflowIntent if detected, None otherwise
+        Now checks smart templates first for better matching.
         """
         message_lower = message.lower()
 
-        # Check each intent pattern
+        # 1. Check smart templates first (more specific)
+        for template_id, template in self.smart_templates.items():
+            # Check trigger keywords
+            keyword_matches = sum(1 for kw in template.get("trigger_keywords", []) 
+                                if kw in message_lower)
+            
+            if keyword_matches >= 2:  # At least 2 keywords match
+                # Extract entities based on template
+                entities = self._extract_entities_from_template(message, template)
+                
+                return WorkflowIntent(
+                    intent_type=template["intent"],
+                    entities=entities,
+                    confidence=template.get("confidence", 0.85),
+                    original_message=message
+                )
+
+        # 2. Fallback to original pattern matching
         for intent_type, pattern in self.patterns.items():
-            # Count keyword matches
             keyword_matches = sum(1 for kw in pattern["keywords"] if kw in message_lower)
 
-            if keyword_matches >= 2:  # At least 2 keywords match
-                # Extract entities
+            if keyword_matches >= 2:
                 entities = self._extract_entities(message, pattern["entities"])
 
                 return WorkflowIntent(
@@ -60,37 +92,65 @@ class IntentDetector:
 
         return None
 
+    def _extract_entities_from_template(self, message: str, template: dict) -> Dict[str, Any]:
+        """Extract entities based on template's entity extraction rules."""
+        entities = {}
+        
+        # Get extraction rules from template
+        extraction_rules = template.get("entity_extraction", {})
+        
+        # Use standard extraction as baseline
+        for var_name, var_config in template.get("variables", {}).items():
+            var_type = var_config.get("type")
+            
+            if var_type == "array":
+                # Extract list (e.g., student names)
+                if var_name == "students":
+                    students = self._extract_student_names(message)
+                    if students:
+                        entities["students"] = students
+            
+            elif var_type == "date":
+                entities["date"] = self._extract_date(message)
+            
+            elif var_type == "enum":
+                # Extract enum value (e.g., status)
+                if var_name == "status":
+                    status = self._extract_status(message)
+                    if status:
+                        entities["status"] = status
+            
+            elif var_type == "string":
+                # Extract string based on pattern
+                if var_name == "institution_code":
+                    code = self._extract_institution_code(message)
+                    if code:
+                        entities["institution_code"] = code
+                elif var_name == "student_name":
+                    students = self._extract_student_names(message)
+                    if students:
+                        entities["student_name"] = students[0]
+        
+        return entities
+
     def _extract_entities(self, message: str, entity_types: List[str]) -> Dict[str, Any]:
-        """
-        Extract entities from message.
-
-        Args:
-            message: User message
-            entity_types: Types of entities to extract
-
-        Returns:
-            Dictionary of extracted entities
-        """
+        """Extract entities from message."""
         entities = {}
 
-        # Extract students (names)
         if "students" in entity_types:
             students = self._extract_student_names(message)
             if students:
                 entities["students"] = students
 
-        # Extract date
         if "date" in entity_types:
             date = self._extract_date(message)
             entities["date"] = date
 
-        # Extract status (present/absent)
         if "status" in entity_types:
             status = self._extract_status(message)
             if status:
                 entities["status"] = status
 
-        # Extract institution code
         if "institution_code" in entity_types:
             code = self._extract_institution_code(message)
             if code:
@@ -100,7 +160,6 @@ class IntentDetector:
 
     def _extract_student_names(self, message: str) -> List[str]:
         """Extract student names from message"""
-        # Pattern: "john", "john and jack", "john, jack, and mary"
         names = []
 
         # Common name pattern (capitalized words)
@@ -121,17 +180,15 @@ class IntentDetector:
             match = re.search(pattern, message.lower())
             if match:
                 names_text = match.group(1)
-                # Split by "and" or ","
                 additional_names = re.split(r'\s+and\s+|,\s*', names_text)
                 names.extend([name.strip().title() for name in additional_names if name.strip()])
 
-        return list(set(names))  # Remove duplicates
+        return list(set(names))
 
     def _extract_date(self, message: str) -> str:
         """Extract date from message"""
         message_lower = message.lower()
 
-        # Check for relative dates
         if "today" in message_lower:
             return datetime.now().strftime("%Y-%m-%d")
         elif "yesterday" in message_lower:
@@ -143,10 +200,10 @@ class IntentDetector:
             tomorrow = datetime.now() + timedelta(days=1)
             return tomorrow.strftime("%Y-%m-%d")
 
-        # Check for specific date format (YYYY-MM-DD, DD/MM/YYYY, etc.)
+        # Check for specific date format
         date_patterns = [
-            r'(\d{4}-\d{2}-\d{2})',  # 2026-02-14
-            r'(\d{2}/\d{2}/\d{4})',  # 14/02/2026
+            r'(\d{4}-\d{2}-\d{2})',
+            r'(\d{2}/\d{2}/\d{4})',
         ]
 
         for pattern in date_patterns:
@@ -154,7 +211,6 @@ class IntentDetector:
             if match:
                 return match.group(1)
 
-        # Default to today
         return datetime.now().strftime("%Y-%m-%d")
 
     def _extract_status(self, message: str) -> Optional[str]:
@@ -166,12 +222,10 @@ class IntentDetector:
         elif "present" in message_lower:
             return "present"
 
-        # Default to absent if students are mentioned without status
         return "absent"
 
     def _extract_institution_code(self, message: str) -> Optional[str]:
         """Extract institution code from message"""
-        # Pattern: P1002, P-1002, etc.
         pattern = r'\b([A-Z]\d{4}|[A-Z]-?\d{4})\b'
         match = re.search(pattern, message)
 
@@ -223,11 +277,22 @@ class WorkflowStore:
 
 
 class WorkflowEngine:
-    """Executes workflows by running script chains"""
+    """Executes workflows with real selector enrichment"""
 
     def __init__(self):
         self.intent_detector = IntentDetector()
         self.workflow_store = WorkflowStore()
+        
+        # Initialize code analyzer if available
+        if CODE_ANALYZER_AVAILABLE:
+            try:
+                self.code_analyzer = get_code_analyzer()
+                print("✓ CodeAnalyzer initialized for selector enrichment")
+            except Exception as e:
+                self.code_analyzer = None
+                print(f"⚠️  CodeAnalyzer initialization failed: {e}")
+        else:
+            self.code_analyzer = None
 
     async def execute_from_message(
         self,
@@ -236,15 +301,7 @@ class WorkflowEngine:
         variables_store
     ) -> Tuple[bool, Optional[WorkflowExecution]]:
         """
-        Detect intent and execute workflow if found.
-
-        Args:
-            message: User's natural language message
-            user: User object
-            variables_store: Variable store for substitution
-
-        Returns:
-            (workflow_found, execution_result)
+        Detect intent and execute workflow with selector enrichment.
         """
         # Detect intent
         intent = await self.intent_detector.detect_intent(message)
@@ -259,7 +316,6 @@ class WorkflowEngine:
         # Check required entities
         missing = [e for e in workflow.requires_entities if e not in intent.entities]
         if missing:
-            # Could ask user for missing info, but for now just fail
             execution = WorkflowExecution(
                 workflow_id=workflow.id,
                 intent=intent,
@@ -280,14 +336,26 @@ class WorkflowEngine:
         user,
         variables_store
     ) -> WorkflowExecution:
-        """Execute workflow steps"""
+        """Execute workflow steps with selector enrichment"""
         start_time = datetime.now()
         script_store = get_script_store()
         user_variables = await variables_store.get_variables_dict(user.username)
 
+        # Get selector context if code analyzer available
+        selector_context = {}
+        if self.code_analyzer:
+            try:
+                selectors = self.code_analyzer.find_selectors_for_task(
+                    intent.original_message
+                )
+                selector_context = selectors
+                print(f"✓ Enriched with {len(selectors.get('ids', []))} IDs, "
+                      f"{len(selectors.get('names', []))} names from source code")
+            except Exception as e:
+                print(f"⚠️  Selector enrichment failed: {e}")
+
         all_commands = []
         steps_executed = 0
-        screenshots = []
 
         try:
             # Execute each step
@@ -302,12 +370,10 @@ class WorkflowEngine:
 
                 # Substitute workflow parameters from entities
                 for param_name, param_value in step.parameters.items():
-                    # Check if parameter references an entity {entity_name}
                     if param_value.startswith("{") and param_value.endswith("}"):
-                        entity_key = param_value[1:-1]  # Remove {}
+                        entity_key = param_value[1:-1]
                         if entity_key in intent.entities:
                             entity_value = intent.entities[entity_key]
-                            # If entity is a list, join with commas
                             if isinstance(entity_value, list):
                                 entity_value = ", ".join(entity_value)
                             commands_json = commands_json.replace(param_value, str(entity_value))
@@ -315,6 +381,10 @@ class WorkflowEngine:
                 # Substitute user variables
                 for var_key, var_value in user_variables.items():
                     commands_json = commands_json.replace(f"{{{var_key}}}", var_value)
+
+                # НОВОЕ: Substitute selectors from code analyzer
+                if selector_context:
+                    commands_json = self._substitute_selectors(commands_json, selector_context)
 
                 # Parse commands
                 commands_data = json.loads(commands_json)
@@ -331,7 +401,7 @@ class WorkflowEngine:
             end_time = datetime.now()
             execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
 
-            # Format success message with entity substitution
+            # Format success message
             message = workflow.success_message
             for entity_key, entity_value in intent.entities.items():
                 if isinstance(entity_value, list):
@@ -362,6 +432,44 @@ class WorkflowEngine:
                 message=f"{workflow.error_message} (Error: {str(e)})",
                 execution_time_ms=execution_time_ms
             )
+
+    def _substitute_selectors(self, commands_json: str, selector_context: dict) -> str:
+        """
+        Substitute placeholder selectors with real ones from code analysis.
+        
+        Replaces patterns like:
+        - {selector:username} → #username
+        - {selector:password} → #password
+        - {selector:submit} → [type='submit']
+        """
+        # Find all selector placeholders
+        placeholder_pattern = r'\{selector:([a-z_]+)\}'
+        
+        def replace_selector(match):
+            selector_name = match.group(1)
+            
+            # Try to find matching selector
+            # 1. Check IDs first
+            for id_selector in selector_context.get('ids', []):
+                if selector_name in id_selector.lower():
+                    return id_selector
+            
+            # 2. Check names
+            for name_selector in selector_context.get('names', []):
+                if selector_name in name_selector.lower():
+                    return name_selector
+            
+            # 3. Fallback to generic selector
+            fallback_map = {
+                'username': '#username',
+                'password': '#password',
+                'submit': '[type="submit"]',
+                'search': 'input[type="search"]',
+                'date': 'input[type="date"]',
+            }
+            return fallback_map.get(selector_name, match.group(0))
+        
+        return re.sub(placeholder_pattern, replace_selector, commands_json)
 
 
 # Singleton instance

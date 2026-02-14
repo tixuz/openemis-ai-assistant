@@ -13,9 +13,10 @@ from backend.models.api_schemas import (
 from backend.models.llm_config import LLMProviderConfig, get_llm_config_store
 from backend.models.auth import User
 from backend.models.learning import LearningExample
-from backend.api.dependencies import require_admin, require_prompt_engineer
+from backend.api.dependencies import require_admin, require_prompt_engineer, require_authenticated
 from backend.core.learning_store import get_learning_store
 from backend.core.prompt_manager import get_prompt_manager
+from backend.core.history_store import get_history_store
 from backend.config import settings
 
 
@@ -424,4 +425,65 @@ async def list_llm_providers(
                 ]
             }
         ]
+    }
+
+
+@router.get("/script-history")
+async def get_script_execution_history(
+    user: User = Depends(require_authenticated),
+    limit: int = 100,
+    offset: int = 0,
+    load_screenshots: bool = False
+):
+    """
+    Get script execution history (from scripts branch).
+
+    Available to all authenticated users (shows their own history).
+    Admins can see all users' history by specifying username parameter.
+
+    Args:
+        limit: Max number of history items (default: 100)
+        offset: Pagination offset (default: 0)
+        load_screenshots: Load screenshot base64 data (default: False)
+
+    Returns:
+        Dictionary with history list and total count
+    """
+    history_store = get_history_store()
+
+    # Get user's script execution history from scripts branch
+    messages = await history_store.get_user_history(
+        username=user.username,
+        limit=limit,
+        offset=offset,
+        branch="scripts"
+    )
+
+    # Get total count
+    total = await history_store.count_user_messages(user.username)
+
+    # Convert to dict
+    history_data = [msg.model_dump() for msg in messages]
+
+    # Optionally load screenshots from scripts branch
+    if load_screenshots:
+        for item in history_data:
+            if item.get("execution_result") and item["execution_result"].get("screenshot_data"):
+                screenshot_list = item["execution_result"]["screenshot_data"]
+                for screenshot_info in screenshot_list:
+                    if "filename" in screenshot_info and "data" not in screenshot_info:
+                        filename = screenshot_info["filename"]
+                        base64_data = await history_store.load_screenshot(
+                            username=user.username,
+                            filename=filename,
+                            branch="scripts"
+                        )
+                        if base64_data:
+                            screenshot_info["data"] = base64_data
+
+    return {
+        "history": history_data,
+        "total": total,
+        "limit": limit,
+        "offset": offset
     }
