@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadProviders() {
     try {
-        const response = await fetch('/api/proxy/admin/llm-config/providers', {
+        const response = await fetch('/api/admin/llm-config/providers', {
             headers: {
                 'Authorization': `Bearer ${getToken()}`
             }
@@ -464,7 +464,7 @@ async function loadProviders() {
 
 async function loadCurrentConfig() {
     try {
-        const response = await fetch('/api/proxy/admin/llm-config', {
+        const response = await fetch('/api/admin/llm-config', {
             headers: {
                 'Authorization': `Bearer ${getToken()}`
             }
@@ -537,7 +537,7 @@ async function saveConfiguration() {
     try {
         const config = buildConfigFromForm();
 
-        const response = await fetch('/api/proxy/admin/llm-config', {
+        const response = await fetch('/api/admin/llm-config', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${getToken()}`,
@@ -574,7 +574,7 @@ async function testConnection() {
     try {
         const config = buildConfigFromForm();
 
-        const response = await fetch('/api/proxy/admin/llm-config/test', {
+        const response = await fetch('/api/admin/llm-config/test', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${getToken()}`,
