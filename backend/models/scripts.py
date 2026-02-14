@@ -28,7 +28,7 @@ class AutomationScript(BaseModel):
     commands: List[Dict[str, Any]] = Field(..., description="Playwright commands")
     parameters: List[ScriptParameter] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list, description="Tags for organization")
-    created_by: str = Field(..., description="Username of creator")
+    created_by: str = Field(default="unknown", description="Username of creator")
     created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     execution_count: int = Field(default=0, description="How many times this script has been run")
